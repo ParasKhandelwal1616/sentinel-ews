@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import * as dotenv from "dotenv";
 import connectDB from "./config/database.js";
+import incidentRoutes from "./routes/incidentRoutes.js";
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.get("/", (req: Request, res: Response) => {
   res.json({ message: "Welcome to Sentinel EWS API" }); // browser में दिखने के लिए
 });
 
+app.use(incidentRoutes);
 app.listen(PORT, () => {
   console.log(`🚀 Server is connected on port ${PORT}`);
 });
