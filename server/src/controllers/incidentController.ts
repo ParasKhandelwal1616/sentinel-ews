@@ -29,3 +29,21 @@ export const reportIncident = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const getIncidents = async (req: Request, res: Response) => {
+  try {
+    const incidents = await Incident.find().sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: incidents.length,
+      data: incidents,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch incidents",
+      error,
+    });
+  }
+};
