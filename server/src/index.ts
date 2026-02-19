@@ -20,8 +20,7 @@ app.get("/", (req: Request, res: Response) => {
   console.log("Welcome to Sentinel API");
   res.json({ message: "Welcome to Sentinel EWS API" }); // browser में दिखने के लिए
 });
-
-app.use(incidentRoutes);
+app.use("/api/incidents", incidentRoutes);
 app.listen(PORT, () => {
   console.log(`🚀 Server is connected on port ${PORT}`);
 });

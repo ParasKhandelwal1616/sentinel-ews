@@ -1,10 +1,20 @@
 import express from "express";
-import { reportIncident } from "../controllers/incidentController.js";
-import { getIncidents } from "../controllers/incidentController.js";
+import {
+  reportIncident,
+  getIncidents,
+  getnearbyincidents,
+} from "../controllers/incidentController.js";
 
 const router = express.Router();
 
-router.post("/api/incidents", reportIncident);
-router.get("/api/getincidents", getIncidents);
+// Logic: Since this router is hooked to "/api/incidents" in index.ts,
+// a simple "/" here means "POST /api/incidents"
+router.post("/", reportIncident);
+
+// Logic: This becomes "GET /api/incidents"
+router.get("/", getIncidents);
+
+// Logic: This becomes "GET /api/incidents/nearby"
+router.get("/nearby", getnearbyincidents);
 
 export default router;
