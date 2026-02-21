@@ -6,6 +6,7 @@ import incidentRoutes from "./routes/incidentRoutes.js";
 import { Server } from "socket.io";
 import { createServer } from "node:http";
 import { errorHandel } from "./middleware/errormiddleware.js";
+import authRoutes from "./routes/authRoutes.js";
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use(cors());
 app.use(express.json());
 
 //routes
+app.use("/api/auth", authRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.get("/", (req: Request, res: Response) => {
   console.log("Welcome to Sentinel API");

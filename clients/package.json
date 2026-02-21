@@ -11,6 +11,8 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "axios": "^1.13.5",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.34.3",
     "lucide-react": "^0.564.0",
     "mapbox-gl": "^3.18.1",
     "next": "16.1.6",
