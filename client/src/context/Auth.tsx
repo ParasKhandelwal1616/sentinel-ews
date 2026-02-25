@@ -1,11 +1,12 @@
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import api from "../lib/axios";
+import api from "../lib/api";
 
 interface AuthContextType {
   user: any;
-  login: (credentials: any) => Promise<void>;
+  login: (creds: any) => Promise<void>;
+  register: (userData: any) => Promise<void>; // <--- Make sure this is here
   logout: () => void;
   loading: boolean;
 }
@@ -17,41 +18,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Check if user is already logged in when the app starts
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
-    if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+    if (storedUser) setUser(JSON.parse(storedUser));
     setLoading(false);
   }, []);
 
-  const login = async (credentials: any) => {
-    const { data } = await api.post("/auth/login", credentials);
+  const login = async (creds: any) => {
+    const { data } = await api.post("/auth/login", creds);
     localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data)); // Save user details
+    localStorage.setItem("user", JSON.stringify(data));
     setUser(data);
     router.push("/dashboard");
   };
 
+  // --- ADD THIS MISSING FUNCTION START ---
+  const register = async (userData: any) => {
+    const { data } = await api.post("/auth/register", userData);
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify(data));
+    setUser(data);
+    router.push("/dashboard");
+  };
+  // --- ADD THIS MISSING FUNCTION END ---
+
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    localStorage.clear();
     setUser(null);
     router.push("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
 }
-
-// This is the actual "Hook" part
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within an AuthProvider");
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 };

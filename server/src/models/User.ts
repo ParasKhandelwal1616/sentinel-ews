@@ -11,12 +11,15 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Hash password before saving
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+// ✅ NEW/CORRECT WAY (20 LPA Standard)
+userSchema.pre("save", async function () {
+  // If password isn't changed, just return (no next needed)
+  if (!this.isModified("password")) return;
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
+  
+  // No next() call here! Mongoose handles it because the function is async.
 });
 
 // Helper method to compare passwords
