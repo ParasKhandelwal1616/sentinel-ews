@@ -1,14 +1,19 @@
+import * as dotenv from "dotenv";
+dotenv.config(); 
+
+// 2. NOW all other imports
 import express, { Request, Response } from "express";
 import cors from "cors";
-import * as dotenv from "dotenv";
 import connectDB from "./config/database.js";
 import incidentRoutes from "./routes/incidentRoutes.js";
 import { Server } from "socket.io";
 import { createServer } from "node:http";
 import { errorHandel } from "./middleware/errormiddleware.js";
 import authRoutes from "./routes/authRoutes.js";
+import passport from 'passport';
 
-dotenv.config();
+// 3. This must come AFTER dotenv.config()
+import './config/passport.js'; 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,10 +24,12 @@ connectDB();
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(passport.initialize());
 
 //routes
 app.use("/api/auth", authRoutes);
 app.use("/api/incidents", incidentRoutes);
+app.use('/api/auth', authRoutes);
 app.get("/", (req: Request, res: Response) => {
   console.log("Welcome to Sentinel API");
   res.json({ message: "Welcome to Sentinel EWS API" }); // browser में दिखने के लिए

@@ -18,6 +18,10 @@ export default function LoginPage() {
       setError(err.response?.data?.message || "Invalid credentials. Try again.");
     }
   };
+  const handleGoogleLogin = () => {
+  // Direct browser redirect to the backend OAuth trigger
+  window.location.href = "http://localhost:5000/api/auth/google";
+};
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">

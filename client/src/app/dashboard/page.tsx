@@ -2,6 +2,8 @@
 import ProtectedRoute from "@/src/components/protectedroutes"; // Cleaned alias
 import { useAuth } from "@/src/context/Auth";
 import dynamic from "next/dynamic";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 // IMPORTANT: Leaflet MUST be dynamic to avoid "Window is not defined" error in Next.js
 const LiveMap = dynamic(() => import("@/src/components/map/Livemap"), { 
@@ -9,7 +11,26 @@ const LiveMap = dynamic(() => import("@/src/components/map/Livemap"), {
 });
 
 export default function DashboardPage() {
-  const { logout, user } = useAuth();
+  const { logout, user } = useAuth();const { user, logout } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = searchParams.get("token");
+    const userData = searchParams.get("user");
+
+    if (token && userData) {
+      // Save the Google credentials to the brain
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", userData);
+      
+      // Clean the URL (remove the token from the address bar)
+      router.replace("/dashboard");
+      
+      // Refresh the page or state to let the app know we are logged in
+      window.location.reload(); 
+    }
+  }, [searchParams, router]);
 
   return (
     <ProtectedRoute>
