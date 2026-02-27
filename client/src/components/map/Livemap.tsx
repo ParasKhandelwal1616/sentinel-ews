@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useState } from "react";
 import api from "@/src/lib/api";
+import {LocationMarker} from "./LocationMarker"; // Import the new click listener
 
 // Fix for default Leaflet icons in Next.js
 const icon = L.icon({
@@ -11,7 +12,7 @@ const icon = L.icon({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-export default function LiveMap() {
+export default function LiveMap({ selectedPos, onSelectLocation }: any) {
   const [incidents, setIncidents] = useState([]);
 
   // FETCH DATA FROM BACKEND
@@ -29,12 +30,16 @@ export default function LiveMap() {
 
   return (
     <MapContainer 
-      center={[23.1815, 75.7849]} // You can adjust this to your village coordinates
+      center={[23.1815, 75.7849]} // Your village coordinates
       zoom={13} 
       className="h-full w-full"
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       
+      {/* 🔴 NEW: This handles the user clicking to report a threat */}
+      <LocationMarker position={selectedPos} onLocationSelected={onSelectLocation} />
+
+      {/* 🔵 EXISTING: This shows the saved threats from MongoDB */}
       {incidents.map((incident: any) => (
         <Marker 
           key={incident._id} 
