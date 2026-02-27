@@ -79,3 +79,20 @@ export const getnearbyincidents = async (
     next(error);
   }
 };
+
+export const createIncident = async (req: Request, res: Response) => {
+  try {
+    // ... your existing validation and saving logic
+    const incident = await Incident.create({ ...req.body });
+
+    // 🔴 NEW: The "Shout" - Broadcast to all connected clients
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("new-incident", incident);
+    }
+
+    res.status(201).json({ success: true, data: incident });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
