@@ -11,9 +11,9 @@ const LiveMap = dynamic(() => import("@/src/components/map/Livemap"), {
 });
 
 export default function DashboardPage() {
-  const { logout, user } = useAuth();const { user, logout } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const token = searchParams.get("token");
