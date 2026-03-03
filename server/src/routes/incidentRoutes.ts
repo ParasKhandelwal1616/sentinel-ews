@@ -3,6 +3,7 @@ import {
   reportIncident,
   getIncidents,
   getnearbyincidents,
+  resolveIncident
 } from "../controllers/incidentController.js";
 import { validate } from "../middleware/validateMiddleware.js";
 import { incidentSchema } from "../validations/incidentValidation.js";
@@ -20,5 +21,6 @@ router.get("/", getIncidents);
 router.get("/nearby", getnearbyincidents);
 
 router.post("/", validate(incidentSchema), reportIncident);
+router.delete('/:id',resolveIncident),
 
 export default router;
