@@ -7,9 +7,25 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    
+    // 🔴 NEW: The Geospatial Location Field
+    location: {
+      type: {
+        type: String,
+        enum: ['Point'], 
+        default: 'Point'
+      },
+      coordinates: {
+        type: [Number], // STRICTLY [longitude, latitude]
+        default: [75.7849, 23.1815] // Defaulting to your testing area coordinates!
+      }
+    }
   },
   { timestamps: true },
 );
+
+// 🔴 NEW: The Engine! Tell MongoDB to index this field for 5km $near searches
+userSchema.index({ location: "2dsphere" });
 
 // ✅ NEW/CORRECT WAY (20 LPA Standard)
 userSchema.pre("save", async function () {
@@ -18,8 +34,6 @@ userSchema.pre("save", async function () {
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  
-  // No next() call here! Mongoose handles it because the function is async.
 });
 
 // Helper method to compare passwords

@@ -330,6 +330,7 @@ export default function DashboardPage() {
                 <span className="font-orbitron text-[10px] font-bold tracking-[2px] text-white">GEO-TRACKING ACTIVE</span>
               </div>
               <div className="flex gap-2">
+                <div className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold text-[#00ff88] bg-[#00ff88]/10 border border-[#00ff88]/30">criticalCount {criticalCount}</div>
                 <div className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold text-[#00ff88] bg-[#00ff88]/10 border border-[#00ff88]/30">
                   <Wifi size={9} /> LIVE
                 </div>
