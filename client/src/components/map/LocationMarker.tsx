@@ -10,7 +10,12 @@ const redIcon = L.icon({
   iconAnchor: [12, 41]
 });
 
-export function LocationMarker({ onLocationSelected, position }: any) {
+interface LocationMarkerProps {
+  onLocationSelected: (latlng: L.LatLng) => void;
+  position: L.LatLngExpression | null;
+}
+
+export function LocationMarker({ onLocationSelected, position }: LocationMarkerProps) {
   useMapEvents({
     click(e) {
       onLocationSelected(e.latlng);

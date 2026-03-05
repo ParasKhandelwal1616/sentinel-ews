@@ -4,13 +4,36 @@ import ProtectedRoute from "@/src/components/protectedroutes";
 import { useAuth } from "@/src/context/Auth";
 import dynamic from "next/dynamic";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "@/src/lib/api";
 import {
-  Shield, LogOut, MapPin, AlertTriangle, Radio,
-  Send, RefreshCw, Wifi, User, ChevronRight,
-  Zap, Activity, X, CheckCircle
+  LogOut, MapPin, AlertTriangle, Radio,
+  Send, Wifi, User, ChevronRight,
+  Activity, CheckCircle
 } from "lucide-react";
+
+// Types
+interface Incident {
+  _id: string;
+  topic: string;
+  description: string;
+  severity: number;
+  location: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+  createdAt: string;
+}
+
+interface Orb {
+  w: number;
+  top?: string;
+  left?: string;
+  bottom?: string;
+  right?: string;
+  c: string;
+  d: string;
+}
 
 // IMPORTANT: Leaflet MUST be dynamic
 const LiveMap = dynamic(() => import("@/src/components/map/Livemap"), {
@@ -43,7 +66,7 @@ function getSev(severity: number) {
 }
 
 /* ─── Threat card ───────────────────────────────────────────────────────── */
-function ThreatCard({ threat, delay = 0, onResolve }: { threat: any; delay?: number; onResolve: (id: string) => void }) {
+function ThreatCard({ threat, delay = 0, onResolve }: { threat: Incident; delay?: number; onResolve: (id: string) => void }) {
   const sev = getSev(threat.severity);
   return (
     <div
@@ -99,22 +122,35 @@ export default function DashboardPage() {
   const [selectedPos, setSelectedPos] = useState<{ lat: number; lng: number } | null>(null);
   const [formData, setFormData] = useState({ topic: "", description: "", severity: 3 });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeThreats, setActiveThreats] = useState<any[]>([]);
+  const [activeThreats, setActiveThreats] = useState<Incident[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
 
   // show radar animation once on mount
   const [showRadar, setShowRadar] = useState(true);
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [activeTab, setActiveTab] = useState<"feed" | "report">("feed");
-  const [submitSuccess, setSubmitSuccess] = useState(false);
   
   // Radar Toggle State
   const [isNearbyMode, setIsNearbyMode] = useState(false);
-  const [operatorLoc, setOperatorLoc] = useState<[number, number]>([75.7849, 23.1815]);
+  const [operatorLoc] = useState<[number, number]>([75.7849, 23.1815]);
+
+  // Handle auto-collapse based on screen size
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setCollapsed(false);
+      } else {
+        setCollapsed(true);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 🔴 UPGRADED: Smart Fetching with Loading State preserved
-  const fetchFeed = async () => {
+  const fetchFeed = useCallback(async () => {
     setIsLoadingFeed(true);
     try {
       let endpoint = "/incidents";
@@ -130,11 +166,11 @@ export default function DashboardPage() {
     } finally {
       setIsLoadingFeed(false);
     }
-  };
+  }, [isNearbyMode, operatorLoc]);
 
   useEffect(() => {
     fetchFeed();
-  }, [isNearbyMode]);
+  }, [fetchFeed]);
 
   // hide radar overlay after its animation completes
   useEffect(() => {
@@ -181,8 +217,6 @@ export default function DashboardPage() {
         }
       });
       
-      setSubmitSuccess(true);
-      setTimeout(() => setSubmitSuccess(false), 3000); 
       setFormData({ topic: "", description: "", severity: 3 });
       setSelectedPos(null);
     } catch (err) {
@@ -194,6 +228,11 @@ export default function DashboardPage() {
 
   const criticalCount = activeThreats.filter((t) => t.severity >= 4).length;
   const sev = getSev(formData.severity);
+
+  const orbs: Orb[] = [
+    { w: 500, top: "-12%", left: "-10%", c: "rgba(0,212,255,0.07)", d: "0s" },
+    { w: 400, bottom: "-10%", right: "-8%", c: "rgba(180,79,255,0.07)", d: "5s" },
+  ];
 
   return (
     <ProtectedRoute>
@@ -252,16 +291,13 @@ export default function DashboardPage() {
         <div className="font-sora relative flex h-screen w-full overflow-hidden bg-[#020e20]">
           
           {/* Background Orbs */}
-          {[
-            { w: 500, top: "-12%", left: "-10%", c: "rgba(0,212,255,0.07)", d: "0s" },
-            { w: 400, bottom: "-10%", right: "-8%", c: "rgba(180,79,255,0.07)", d: "5s" },
-          ].map((o, i) => (
+          {orbs.map((o, i) => (
             <div
               key={i}
               className="pointer-events-none absolute rounded-full"
               style={{
                 width: o.w, height: o.w,
-                top: (o as any).top, left: (o as any).left, right: (o as any).right, bottom: (o as any).bottom,
+                top: o.top, left: o.left, right: o.right, bottom: o.bottom,
                 background: `radial-gradient(circle, ${o.c}, transparent 68%)`,
                 filter: "blur(70px)",
                 animation: `orb-drift 16s ease-in-out ${o.d} infinite`,
@@ -269,8 +305,8 @@ export default function DashboardPage() {
             />
           ))}
 
-          {/* SIDEBAR */}
-         <aside className={`flex-shrink-0 bg-slate-950/80 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] z-30 transition-all duration-300 ${collapsed ? "w-16 p-2" : "w-80 p-6"} overflow-y-auto custom-scrollbar`}>
+          {/* SIDEBAR - Fixed overlay on mobile, flex sibling on desktop */}
+         <aside className={`fixed md:relative inset-y-0 left-0 bg-slate-950/80 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] z-40 transition-all duration-300 ${collapsed ? "w-16 p-2" : "w-72 md:w-80 p-6"} overflow-y-auto thin-scroll md:flex-shrink-0`}>
             {/* Header */}
             <div className="flex flex-shrink-0 items-center justify-between px-1 py-4 border-b border-white/10">
               {!collapsed && (
@@ -321,9 +357,10 @@ export default function DashboardPage() {
                       {/* Proximity Filter UI */}
                       <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
                         <span className="text-[10px] font-orbitron font-bold tracking-widest text-white/50 uppercase">
-                          Proximity Filter
+                          Proximity
                         </span>
                         <button
+                          type="button"
                           onClick={() => setIsNearbyMode(!isNearbyMode)}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold transition-all ${
                             isNearbyMode 
@@ -332,7 +369,7 @@ export default function DashboardPage() {
                           }`}
                         >
                           <MapPin size={12} />
-                          {isNearbyMode ? "5KM RADAR" : "GLOBAL VIEW"}
+                          {isNearbyMode ? "5KM" : "GLOBAL"}
                         </button>
                       </div>
 
@@ -340,7 +377,7 @@ export default function DashboardPage() {
                       {isLoadingFeed ? (
                         <span className="text-xs text-white/30 text-center mt-4 block">Scanning...</span>
                       ) : activeThreats.length === 0 ? (
-                        <span className="text-xs text-white/30 text-center mt-4 block">Area secure. NO THREATS DETECTED.</span>
+                        <span className="text-xs text-white/30 text-center mt-4 block px-2">Area secure. NO THREATS DETECTED.</span>
                       ) : (
                         activeThreats.map((t, i) => (
                           <ThreatCard 
@@ -360,10 +397,10 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-2 rounded-xl p-2.5 border border-white/10 bg-white/5">
                         <MapPin size={11} className={selectedPos ? "text-[#00d4ff]" : "text-white/20"} />
                         <span className={`font-mono text-[10px] ${selectedPos ? "text-[#00d4ff]" : "text-white/20"}`}>
-                          {selectedPos ? `${selectedPos.lat.toFixed(5)}, ${selectedPos.lng.toFixed(5)}` : "Click map to pin location"}
+                          {selectedPos ? `${selectedPos.lat.toFixed(5)}, ${selectedPos.lng.toFixed(5)}` : "Click map to pin"}
                         </span>
                       </div>
-                      <input type="text" placeholder="Threat Topic (e.g. Flood)" value={formData.topic} onChange={(e) => setFormData({...formData, topic: e.target.value})} className="s-input" />
+                      <input type="text" placeholder="Topic (e.g. Flood)" value={formData.topic} onChange={(e) => setFormData({...formData, topic: e.target.value})} className="s-input" />
                       <textarea placeholder="Situation description..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="s-input h-[72px]" />
                       <div>
                         <div className="mb-1.5 flex justify-between text-[9px] uppercase text-white/30"><label>Severity</label><span>{formData.severity}/5</span></div>
@@ -388,16 +425,21 @@ export default function DashboardPage() {
           {/* MAIN MAP AREA */}
           <main className="relative flex-1 bg-black overflow-hidden h-full w-full">
             
-            {/* HUD Bar */}
-            <div className="glass absolute left-3 right-3 top-3 z-20 flex items-center justify-between rounded-2xl px-4 py-2.5">
-              <div className="flex items-center gap-2">
-                <Activity size={12} className="text-[#00d4ff]" />
-                <span className="font-orbitron text-[10px] font-bold tracking-[2px] text-white">GEO-TRACKING ACTIVE</span>
+            {/* HUD Bar - Adjusted for mobile responsiveness */}
+            <div className={`glass absolute left-3 right-3 top-3 z-20 flex items-center justify-between rounded-2xl px-3 py-2 md:px-4 md:py-2.5 transition-all duration-300 ${collapsed ? "md:left-3" : "md:left-3"}`}>
+              <div className="flex items-center gap-1.5 md:gap-2 overflow-hidden mr-2">
+                <Activity size={12} className="text-[#00d4ff] flex-shrink-0" />
+                <span className="font-orbitron text-[8px] md:text-[10px] font-bold tracking-[1px] md:tracking-[2px] text-white truncate uppercase">
+                  <span className="hidden xs:inline">GEO-TRACKING</span> ACTIVE
+                </span>
               </div>
-              <div className="flex gap-2">
-                <div className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold text-[#00ff88] bg-[#00ff88]/10 border border-[#00ff88]/30">criticalCount {criticalCount}</div>
-                <div className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold text-[#00ff88] bg-[#00ff88]/10 border border-[#00ff88]/30">
-                  <Wifi size={9} /> LIVE
+              <div className="flex gap-1.5 md:gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1 md:gap-1.5 rounded-full px-2 md:px-3 py-1 text-[8px] md:text-[10px] font-bold text-[#ff4444] bg-[#ff4444]/10 border border-[#ff4444]/30">
+                  <span className="hidden sm:inline">CRITICAL:</span> {criticalCount}
+                </div>
+                <div className="flex items-center gap-1 md:gap-1.5 rounded-full px-2 md:px-3 py-1 text-[8px] md:text-[10px] font-bold text-[#00ff88] bg-[#00ff88]/10 border border-[#00ff88]/30">
+                  <Wifi size={9} className="flex-shrink-0" /> 
+                  <span className="hidden xs:inline">LIVE</span>
                 </div>
               </div>
             </div>
@@ -420,7 +462,7 @@ export default function DashboardPage() {
               <LiveMap 
                  selectedPos={selectedPos} 
                  onSelectLocation={setSelectedPos} 
-                 onNewIncident={(newIncident: any) => { setActiveThreats((prev) => [newIncident, ...prev]); }}
+                 onNewIncident={(newIncident: Incident) => { setActiveThreats((prev) => [newIncident, ...prev]); }}
                  onThreatResolved={(resolvedId: string) => { setActiveThreats((prev) => prev.filter((t) => t._id !== resolvedId)); }}
               />
             </div>

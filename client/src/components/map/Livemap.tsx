@@ -10,6 +10,26 @@ import { io } from "socket.io-client";
 // Connect to WebSocket server
 const socket = io("http://localhost:5000");
 
+interface Incident {
+  _id: string;
+  topic: string;
+  description: string;
+  severity: number;
+  location?: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+  createdAt?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface LiveMapProps {
+  selectedPos: { lat: number; lng: number } | null;
+  onSelectLocation: (pos: { lat: number; lng: number }) => void;
+  onNewIncident?: (incident: Incident) => void;
+}
+
 /* ─── inject dark popup styles once ────────────────────────────────────── */
 const POPUP_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@600;700&family=Sora:wght@400;500;600&display=swap');
@@ -72,7 +92,7 @@ const getSeverityIcon = (severity: number) => {
 };
 
 /* ─── Styled popup content ───────────────────────────────────────────────── */
-function IncidentPopup({ incident }: { incident: any }) {
+function IncidentPopup({ incident }: { incident: Incident }) {
   const sev = getSevConfig(incident.severity);
   const time = incident.createdAt
     ? new Date(incident.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -224,8 +244,8 @@ function IncidentPopup({ incident }: { incident: any }) {
 /* ══════════════════════════════════════════════════════════════════════════
    LIVEMAP — identical props and all original logic preserved
 ══════════════════════════════════════════════════════════════════════════ */
-export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }: any) {
-  const [incidents, setIncidents] = useState<any[]>([]);
+export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }: LiveMapProps) {
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [operatorLocation, setOperatorLocation] = useState<[number, number]>([23.1815, 75.7849]);
 
   useEffect(() => {
@@ -262,7 +282,7 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
     fetchIncidents();
 
     // 3. LISTEN FOR LIVE BROADCASTS
-    socket.on("new-incident", (newIncident) => {
+    socket.on("new-incident", (newIncident: Incident) => {
       // Update the map's pins
       setIncidents((prev) => [...prev, newIncident]);
 
@@ -295,7 +315,7 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
       <LocationMarker position={selectedPos} onLocationSelected={onSelectLocation} />
 
       {/* Render all incidents with safety checks and dynamic colors */}
-      {incidents.map((incident: any) => {
+      {incidents.map((incident: Incident) => {
         // Safely extract coordinates using optional chaining
         const lat = incident?.location?.coordinates?.[1] || incident?.latitude;
         const lng = incident?.location?.coordinates?.[0] || incident?.longitude;
