@@ -1,5 +1,5 @@
 "use client";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useState } from "react";
@@ -55,6 +55,23 @@ const POPUP_STYLES = `
     transition: color .15s !important;
   }
   .leaflet-popup-close-button:hover { color: #ff3b3b !important; }
+
+  /* Zoom Control Styling */
+  .leaflet-control-zoom {
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+  }
+  .leaflet-control-zoom-in, .leaflet-control-zoom-out {
+    background: rgba(15, 23, 42, 0.9) !important;
+    color: #00d4ff !important;
+    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+  }
+  .leaflet-control-zoom-in:hover, .leaflet-control-zoom-out:hover {
+    background: #00d4ff !important;
+    color: #000 !important;
+  }
 
   /* Pulse animation for critical markers */
   @keyframes marker-pulse {
@@ -301,12 +318,16 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
     <MapContainer
       center={operatorLocation}
       zoom={13}
+      zoomControl={false}
       className="h-full w-full relative z-0"
     >
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution="&copy; CARTO"
       />
+
+      {/* Manual Zoom Control in the bottom-right corner */}
+      <ZoomControl position="bottomright" />
 
       {/* 🎯 Forces the map to move when operatorLocation updates */}
       <MapRecenter center={operatorLocation} />

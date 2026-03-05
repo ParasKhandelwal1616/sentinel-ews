@@ -4,7 +4,7 @@ import ProtectedRoute from "@/src/components/protectedroutes";
 import { useAuth } from "@/src/context/Auth";
 import dynamic from "next/dynamic";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import api from "@/src/lib/api";
 import {
   LogOut, MapPin, AlertTriangle, Radio,
@@ -114,7 +114,7 @@ function ThreatCard({ threat, delay = 0, onResolve }: { threat: Incident; delay?
   );
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { user, logout } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -130,15 +130,20 @@ export default function DashboardPage() {
 
   const [collapsed, setCollapsed] = useState(true);
   const [activeTab, setActiveTab] = useState<"feed" | "report">("feed");
+  const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
   // Radar Toggle State
   const [isNearbyMode, setIsNearbyMode] = useState(false);
   const [operatorLoc] = useState<[number, number]>([75.7849, 23.1815]);
 
-  // Handle auto-collapse based on screen size
+  // Handle auto-collapse and mobile detection based on screen size
   useEffect(() => {
+    setMounted(true);
     const handleResize = () => {
-      if (window.innerWidth >= 768) {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
         setCollapsed(false);
       } else {
         setCollapsed(true);
@@ -234,6 +239,8 @@ export default function DashboardPage() {
     { w: 400, bottom: "-10%", right: "-8%", c: "rgba(180,79,255,0.07)", d: "5s" },
   ];
 
+  if (!mounted) return <div className="h-screen w-full bg-[#020e20]" />;
+
   return (
     <ProtectedRoute>
       <>
@@ -305,11 +312,26 @@ export default function DashboardPage() {
             />
           ))}
 
-          {/* SIDEBAR - Fixed overlay on mobile, flex sibling on desktop */}
-         <aside className={`fixed md:relative inset-y-0 left-0 bg-slate-950/80 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] z-40 transition-all duration-300 ${collapsed ? "w-16 p-2" : "w-72 md:w-80 p-6"} overflow-y-auto thin-scroll md:flex-shrink-0`}>
+          {/* Mobile Tab Toggle - Only visible on mobile when sidebar is collapsed */}
+          {collapsed && (
+            <button 
+              onClick={() => setCollapsed(false)} 
+              className="fixed left-0 top-1/2 -translate-y-1/2 z-50 md:hidden bg-slate-900/80 backdrop-blur-lg border border-l-0 border-slate-700 p-3 rounded-r-2xl text-[#00d4ff] shadow-[0_0_20px_rgba(0,0,0,0.5)] transition-all active:scale-95"
+            >
+              <ChevronRight size={24} />
+            </button>
+          )}
+
+          {/* SIDEBAR - Entirely hidden off-screen on mobile when collapsed */}
+         <aside className={`fixed md:relative inset-y-0 left-0 bg-slate-950/80 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] z-40 transition-all duration-300 
+           ${collapsed 
+             ? "-translate-x-full md:translate-x-0 md:w-16 md:p-2" 
+             : "translate-x-0 w-[85vw] md:w-80 p-6"} 
+           overflow-y-auto thin-scroll md:flex-shrink-0`}>
+            
             {/* Header */}
             <div className="flex flex-shrink-0 items-center justify-between px-1 py-4 border-b border-white/10">
-              {!collapsed && (
+              {(!collapsed || isMobile) && (
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl text-xl bg-gradient-to-br from-[#00d4ff] to-[#b44fff]">🛡️</div>
                   <div>
@@ -323,7 +345,7 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {!collapsed && (
+            {(!collapsed || isMobile) && (
               <div className="flex flex-1 flex-col overflow-hidden px-1 py-3">
                 {/* Operator Card */}
                 <div className="mb-3 flex items-center gap-2.5 rounded-2xl p-3 bg-white/5 border border-white/10">
@@ -417,7 +439,7 @@ export default function DashboardPage() {
             
             <div className="mt-auto pt-3 border-t border-white/10">
               <button onClick={logout} className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[11px] font-semibold text-white/30 hover:text-[#ff4444] border border-white/10">
-                <LogOut size={12} /> {!collapsed && "Logout"}
+                <LogOut size={12} /> {(!collapsed || isMobile) && "Logout"}
               </button>
             </div>
           </aside>
@@ -426,7 +448,7 @@ export default function DashboardPage() {
           <main className="relative flex-1 bg-black overflow-hidden h-full w-full">
             
             {/* HUD Bar - Adjusted for mobile responsiveness */}
-            <div className={`glass absolute left-3 right-3 top-3 z-20 flex items-center justify-between rounded-2xl px-3 py-2 md:px-4 md:py-2.5 transition-all duration-300 ${collapsed ? "md:left-3" : "md:left-3"}`}>
+            <div className={`glass absolute left-3 right-3 top-3 z-20 flex items-center justify-between rounded-2xl px-3 py-2 md:px-4 md:py-2.5 transition-all duration-300`}>
               <div className="flex items-center gap-1.5 md:gap-2 overflow-hidden mr-2">
                 <Activity size={12} className="text-[#00d4ff] flex-shrink-0" />
                 <span className="font-orbitron text-[8px] md:text-[10px] font-bold tracking-[1px] md:tracking-[2px] text-white truncate uppercase">
@@ -471,5 +493,13 @@ export default function DashboardPage() {
         </div>
       </>
     </ProtectedRoute>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="h-screen w-full bg-[#020e20] flex items-center justify-center text-white/50 font-orbitron tracking-widest">INITIALIZING SECURE LINK...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
