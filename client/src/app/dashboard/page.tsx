@@ -9,7 +9,7 @@ import api from "@/src/lib/api";
 import {
   Shield, LogOut, MapPin, AlertTriangle, Radio,
   Send, RefreshCw, Wifi, User, ChevronRight,
-  Zap, Activity, X,
+  Zap, Activity, X, CheckCircle
 } from "lucide-react";
 
 // IMPORTANT: Leaflet MUST be dynamic
@@ -43,7 +43,7 @@ function getSev(severity: number) {
 }
 
 /* ─── Threat card ───────────────────────────────────────────────────────── */
-function ThreatCard({ threat, delay = 0 }: { threat: any; delay?: number }) {
+function ThreatCard({ threat, delay = 0, onResolve }: { threat: any; delay?: number; onResolve: (id: string) => void }) {
   const sev = getSev(threat.severity);
   return (
     <div
@@ -67,15 +67,25 @@ function ThreatCard({ threat, delay = 0 }: { threat: any; delay?: number }) {
             {new Date(threat.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </span>
         </div>
-        <p className="line-clamp-2 text-[10px] leading-relaxed text-white/38">
+        <p className="line-clamp-2 text-[10px] leading-relaxed text-white/38 mb-2">
           {threat.description || "No description provided."}
         </p>
-        <span
-          className="mt-1.5 inline-block rounded px-1.5 py-0.5 text-[8px] font-black tracking-widest"
-          style={{ background: sev.bg, color: sev.color, border: `1px solid ${sev.color}25` }}
-        >
-          {sev.label}
-        </span>
+        
+        <div className="flex items-center justify-between mt-1.5">
+          <span
+            className="inline-block rounded px-1.5 py-0.5 text-[8px] font-black tracking-widest"
+            style={{ background: sev.bg, color: sev.color, border: `1px solid ${sev.color}25` }}
+          >
+            {sev.label}
+          </span>
+          
+          <button 
+            onClick={() => onResolve(threat._id)}
+            className="flex items-center gap-1 text-[9px] font-bold text-white/30 hover:text-[#00ff88] transition-colors px-2 py-1 rounded bg-white/5 hover:bg-[#00ff88]/10 border border-transparent hover:border-[#00ff88]/30"
+          >
+            <CheckCircle size={10} /> RESOLVE
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -98,26 +108,37 @@ export default function DashboardPage() {
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<"feed" | "report">("feed");
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  
+  // Radar Toggle State
+  const [isNearbyMode, setIsNearbyMode] = useState(false);
+  const [operatorLoc, setOperatorLoc] = useState<[number, number]>([75.7849, 23.1815]);
 
+  // 🔴 UPGRADED: Smart Fetching with Loading State preserved
   const fetchFeed = async () => {
     setIsLoadingFeed(true);
     try {
-      const { data } = await api.get("/incidents");
-      setActiveThreats(
-        data.data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      );
+      let endpoint = "/incidents";
+      
+      if (isNearbyMode) {
+        endpoint = `/incidents/nearby?lng=${operatorLoc[0]}&lat=${operatorLoc[1]}&dist=5000`;
+      }
+
+      const res = await api.get(endpoint);
+      setActiveThreats(res.data.data);
     } catch (err) {
-      console.error("Failed to load threat feed:", err);
+      console.error("Failed to fetch feed:", err);
     } finally {
       setIsLoadingFeed(false);
     }
   };
 
-  useEffect(() => { fetchFeed(); }, []);
+  useEffect(() => {
+    fetchFeed();
+  }, [isNearbyMode]);
 
   // hide radar overlay after its animation completes
   useEffect(() => {
-    const timer = setTimeout(() => setShowRadar(false), 2500); // 1s delay + 1.5s animation ≈2.5s
+    const timer = setTimeout(() => setShowRadar(false), 2500); 
     return () => clearTimeout(timer);
   }, []);
 
@@ -131,6 +152,17 @@ export default function DashboardPage() {
       window.location.reload();
     }
   }, [searchParams, router]);
+
+  // 🔴 HANDLE RESOLVE THREAT
+  const handleResolveThreat = async (id: string) => {
+    try {
+      setActiveThreats((prev) => prev.filter((t) => t._id !== id));
+      await api.delete(`/incidents/${id}`);
+    } catch (err) {
+      console.error("Failed to resolve threat:", err);
+      fetchFeed(); 
+    }
+  };
 
   const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -282,14 +314,47 @@ export default function DashboardPage() {
 
                 {/* Tab Content */}
                 <div className="thin-scroll flex-1 overflow-y-auto">
+                  {/* LIVE FEED SECTION */}
                   {activeTab === "feed" && (
                     <div className="flex flex-col gap-2">
-                      {isLoadingFeed ? <span className="text-xs text-white/30 text-center mt-4">Scanning...</span> : 
-                       activeThreats.length === 0 ? <span className="text-xs text-white/30 text-center mt-4">Area secure.</span> :
-                       activeThreats.map((t, i) => <ThreatCard key={t._id} threat={t} delay={i * 0.05} />)}
+                      
+                      {/* Proximity Filter UI */}
+                      <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
+                        <span className="text-[10px] font-orbitron font-bold tracking-widest text-white/50 uppercase">
+                          Proximity Filter
+                        </span>
+                        <button
+                          onClick={() => setIsNearbyMode(!isNearbyMode)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold transition-all ${
+                            isNearbyMode 
+                              ? "bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/50 shadow-[0_0_10px_rgba(0,255,136,0.3)]" 
+                              : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10"
+                          }`}
+                        >
+                          <MapPin size={12} />
+                          {isNearbyMode ? "5KM RADAR" : "GLOBAL VIEW"}
+                        </button>
+                      </div>
+
+                      {/* Feed Loading & Rendering Logic */}
+                      {isLoadingFeed ? (
+                        <span className="text-xs text-white/30 text-center mt-4 block">Scanning...</span>
+                      ) : activeThreats.length === 0 ? (
+                        <span className="text-xs text-white/30 text-center mt-4 block">Area secure. NO THREATS DETECTED.</span>
+                      ) : (
+                        activeThreats.map((t, i) => (
+                          <ThreatCard 
+                            key={t._id} 
+                            threat={t} 
+                            delay={i * 0.05} 
+                            onResolve={handleResolveThreat} 
+                          />
+                        ))
+                      )}
                     </div>
                   )}
 
+                  {/* REPORT THREAT SECTION */}
                   {activeTab === "report" && (
                     <form onSubmit={handleReportSubmit} className="flex flex-col gap-3 pb-2">
                       <div className="flex items-center gap-2 rounded-xl p-2.5 border border-white/10 bg-white/5">
@@ -345,7 +410,7 @@ export default function DashboardPage() {
                   height: '1px',
                   background: '#00d4ff',
                   boxShadow: '0 0 18px 3px rgba(0,212,255,0.8)',
-                  animation: 'fast-scan 1.5s linear infinite', // Extremely fast CSS sweep
+                  animation: 'fast-scan 1.5s linear infinite', 
                 }}
               />
             )}
@@ -356,6 +421,7 @@ export default function DashboardPage() {
                  selectedPos={selectedPos} 
                  onSelectLocation={setSelectedPos} 
                  onNewIncident={(newIncident: any) => { setActiveThreats((prev) => [newIncident, ...prev]); }}
+                 onThreatResolved={(resolvedId: string) => { setActiveThreats((prev) => prev.filter((t) => t._id !== resolvedId)); }}
               />
             </div>
 
