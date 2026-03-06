@@ -111,7 +111,9 @@ export default function DashboardPage() {
   
   // Radar Toggle State
   const [isNearbyMode, setIsNearbyMode] = useState(false);
-  const [operatorLoc, setOperatorLoc] = useState<[number, number]>([75.7849, 23.1815]);
+  
+  // 🔴 FIXED: Start as null. No hardcoded location.
+  const [operatorLoc, setOperatorLoc] = useState<[number, number] | null>(null);
 
   // 🔴 UPGRADED: Smart Fetching with Loading State preserved
   const fetchFeed = async () => {
@@ -120,6 +122,13 @@ export default function DashboardPage() {
       let endpoint = "/incidents";
       
       if (isNearbyMode) {
+        // 🔴 STRICT REAL-WORLD CHECK: No GPS lock = No Radar
+        if (!operatorLoc) {
+          alert("COMMAND ERROR: Awaiting GPS lock. Cannot calculate 5km proximity.");
+          setIsNearbyMode(false); // Force the toggle back off
+          setIsLoadingFeed(false);
+          return;
+        }
         endpoint = `/incidents/nearby?lng=${operatorLoc[0]}&lat=${operatorLoc[1]}&dist=5000`;
       }
 
@@ -131,12 +140,41 @@ export default function DashboardPage() {
       setIsLoadingFeed(false);
     }
   };
+// 🛰️ LIVE GPS TELEMETRY: Track the operator's physical movement
+  useEffect(() => {
+    if (!("geolocation" in navigator)) {
+      console.warn("Hardware Error: Geolocation not supported by this device.");
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { longitude, latitude } = position.coords;
+        setOperatorLoc([longitude, latitude]);
+        console.log(`📍 GPS Lock Acquired: [${longitude.toFixed(4)}, ${latitude.toFixed(4)}]`);
+      },
+      (error) => {
+        console.error("GPS Lock Failed:", error.message);
+        console.log("⚙️ Injecting fallback coordinates (Gwalior)...");
+        setOperatorLoc([78.1828, 26.2183]); 
+        
+        // 🔴 THE FIX: Kill the watcher immediately so it doesn't spam the console!
+        navigator.geolocation.clearWatch(watchId);
+      },
+      { 
+        enableHighAccuracy: false, 
+        maximumAge: 10000, 
+        timeout: 10000 
+      }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
 
   useEffect(() => {
     fetchFeed();
   }, [isNearbyMode]);
 
-  // hide radar overlay after its animation completes
   useEffect(() => {
     const timer = setTimeout(() => setShowRadar(false), 2500); 
     return () => clearTimeout(timer);
@@ -153,7 +191,6 @@ export default function DashboardPage() {
     }
   }, [searchParams, router]);
 
-  // 🔴 HANDLE RESOLVE THREAT
   const handleResolveThreat = async (id: string) => {
     try {
       setActiveThreats((prev) => prev.filter((t) => t._id !== id));
@@ -388,21 +425,36 @@ export default function DashboardPage() {
           {/* MAIN MAP AREA */}
           <main className="relative flex-1 bg-black overflow-hidden h-full w-full">
             
-            {/* HUD Bar */}
+            {/* 🔴 FIXED: Dynamic HUD Bar */}
             <div className="glass absolute left-3 right-3 top-3 z-20 flex items-center justify-between rounded-2xl px-4 py-2.5">
               <div className="flex items-center gap-2">
-                <Activity size={12} className="text-[#00d4ff]" />
-                <span className="font-orbitron text-[10px] font-bold tracking-[2px] text-white">GEO-TRACKING ACTIVE</span>
+                <Activity size={12} className={operatorLoc ? "text-[#00d4ff]" : "text-[#ff8c42] animate-pulse"} />
+                <span className="font-orbitron text-[10px] font-bold tracking-[2px] text-white hidden sm:inline">
+                  {operatorLoc ? "GEO-TRACKING ACTIVE" : "SEARCHING SATELLITES"}
+                </span>
+                
+                {operatorLoc ? (
+                  <span className="font-mono text-[9px] text-[#00ff88]/70 ml-2 border-l border-white/10 pl-2">
+                    [{operatorLoc[0].toFixed(4)}, {operatorLoc[1].toFixed(4)}]
+                  </span>
+                ) : (
+                  <span className="font-mono text-[9px] text-[#ff8c42]/70 ml-2 border-l border-white/10 pl-2 animate-pulse">
+                    ACQUIRING SIGNAL...
+                  </span>
+                )}
               </div>
+
               <div className="flex gap-2">
-                <div className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold text-[#00ff88] bg-[#00ff88]/10 border border-[#00ff88]/30">criticalCount {criticalCount}</div>
+                <div className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold text-[#ff4444] bg-[#ff4444]/10 border border-[#ff4444]/30">
+                  <AlertTriangle size={9} /> {criticalCount} CRITICAL
+                </div>
                 <div className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold text-[#00ff88] bg-[#00ff88]/10 border border-[#00ff88]/30">
                   <Wifi size={9} /> LIVE
                 </div>
               </div>
             </div>
 
-            {/* 🔴 FAST RADAR OVERLAY (shown once at startup) */}
+            {/* 🔴 FAST RADAR OVERLAY */}
             {showRadar && (
               <div
                 className="absolute left-0 right-0 z-10 pointer-events-none"
@@ -415,16 +467,19 @@ export default function DashboardPage() {
               />
             )}
 
-            {/* 📍 THE MAP CONTAINER (Forced Height) */}
+            {/* 📍 THE MAP CONTAINER */}
             <div className="absolute inset-0 z-0 h-full w-full cursor-crosshair">
+              
+              {/* 🔴 FIXED: Passing the live GPS data down to the map */}
               <LiveMap 
                  selectedPos={selectedPos} 
                  onSelectLocation={setSelectedPos} 
                  onNewIncident={(newIncident: any) => { setActiveThreats((prev) => [newIncident, ...prev]); }}
                  onThreatResolved={(resolvedId: string) => { setActiveThreats((prev) => prev.filter((t) => t._id !== resolvedId)); }}
+                 operatorLoc={operatorLoc} 
               />
+              
             </div>
-
           </main>
         </div>
       </>

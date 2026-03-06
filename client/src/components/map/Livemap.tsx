@@ -43,11 +43,27 @@ const POPUP_STYLES = `
   }
 `;
 
-/* ─── 🎯 MapRecenter — identical logic ─────────────────────────────────── */
+/* ─── 🔴 NEW: The White Operator Beacon ───────────────────────────────── */
+const operatorIcon = L.divIcon({
+  className: "clear-background",
+  html: `<div style="
+    width: 14px; 
+    height: 14px; 
+    background-color: #ffffff; 
+    border-radius: 50%; 
+    border: 3px solid #00d4ff;
+    box-shadow: 0 0 20px 6px rgba(0, 212, 255, 0.6);
+    animation: marker-pulse 2s infinite;
+  "></div>`,
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
+
+/* ─── 🎯 MapRecenter ─────────────────────────────────── */
 function MapRecenter({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(center, 15, { animate: true, duration: 1.5 });
+    map.flyTo(center, 14, { animate: true, duration: 1.5 });
   }, [center, map]);
   return null;
 }
@@ -59,7 +75,7 @@ function getSevConfig(severity: number) {
   return                     { color: "green",  hex: "#00e676", label: "LOW",      dim: "rgba(0,230,118,0.10)"  };
 }
 
-/* ─── 🎨 getSeverityIcon — identical URL logic, same colors ─────────────── */
+/* ─── 🎨 getSeverityIcon ─────────────── */
 const getSeverityIcon = (severity: number) => {
   const { color } = getSevConfig(severity);
   return L.icon({
@@ -88,145 +104,42 @@ function IncidentPopup({ incident }: { incident: any }) {
         overflow: "hidden",
       }}
     >
-      {/* Top accent line */}
-      <div style={{
-        height: 2,
-        background: `linear-gradient(90deg, transparent, ${sev.hex}, transparent)`,
-      }} />
-
-      {/* Header */}
-      <div style={{
-        padding: "10px 14px 8px",
-        background: `${sev.dim}`,
-        borderBottom: `1px solid ${sev.hex}20`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 8,
-      }}>
-        <span style={{
-          fontFamily: "'Rajdhani', sans-serif",
-          fontSize: 13,
-          fontWeight: 700,
-          letterSpacing: "2px",
-          color: sev.hex,
-          textTransform: "uppercase",
-        }}>
+      <div style={{ height: 2, background: `linear-gradient(90deg, transparent, ${sev.hex}, transparent)` }} />
+      <div style={{ padding: "10px 14px 8px", background: `${sev.dim}`, borderBottom: `1px solid ${sev.hex}20`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "2px", color: sev.hex, textTransform: "uppercase" }}>
           {incident.topic}
         </span>
-        <span style={{
-          fontFamily: "'Share Tech Mono', monospace",
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: "1.5px",
-          color: sev.hex,
-          background: `${sev.dim}`,
-          border: `1px solid ${sev.hex}30`,
-          borderRadius: 5,
-          padding: "2px 6px",
-        }}>
+        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1.5px", color: sev.hex, background: `${sev.dim}`, border: `1px solid ${sev.hex}30`, borderRadius: 5, padding: "2px 6px" }}>
           {sev.label}
         </span>
       </div>
-
-      {/* Body */}
       <div style={{ padding: "10px 14px 12px" }}>
-        {/* Description */}
         {incident.description && (
-          <p style={{
-            fontFamily: "'Sora', sans-serif",
-            fontSize: 11,
-            color: "rgba(200,225,255,0.60)",
-            lineHeight: 1.55,
-            marginBottom: 10,
-          }}>
+          <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 11, color: "rgba(200,225,255,0.60)", lineHeight: 1.55, marginBottom: 10 }}>
             {incident.description}
           </p>
         )}
-
-        {/* Severity bar */}
         <div style={{ marginBottom: 10 }}>
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 5,
-          }}>
-            <span style={{
-              fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 9,
-              letterSpacing: "1.5px",
-              color: "rgba(255,255,255,0.25)",
-              textTransform: "uppercase",
-            }}>
-              Threat Level
-            </span>
-            <span style={{
-              fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 11,
-              fontWeight: 700,
-              color: sev.hex,
-            }}>
-              {incident.severity}/5
-            </span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "1.5px", color: "rgba(255,255,255,0.25)", textTransform: "uppercase" }}>Threat Level</span>
+            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, fontWeight: 700, color: sev.hex }}>{incident.severity}/5</span>
           </div>
-          {/* Visual bar */}
-          <div style={{
-            display: "flex",
-            gap: 3,
-          }}>
+          <div style={{ display: "flex", gap: 3 }}>
             {[1,2,3,4,5].map(n => (
-              <div key={n} style={{
-                flex: 1,
-                height: 4,
-                borderRadius: 3,
-                background: n <= incident.severity ? sev.hex : "rgba(255,255,255,0.07)",
-                boxShadow: n <= incident.severity ? `0 0 6px ${sev.hex}60` : "none",
-                transition: "all .2s",
-              }} />
+              <div key={n} style={{ flex: 1, height: 4, borderRadius: 3, background: n <= incident.severity ? sev.hex : "rgba(255,255,255,0.07)", boxShadow: n <= incident.severity ? `0 0 6px ${sev.hex}60` : "none", transition: "all .2s" }} />
             ))}
           </div>
         </div>
-
-        {/* Coordinates */}
-        {(() => {
-          const lat = incident?.location?.coordinates?.[1] ?? incident?.latitude;
-          const lng = incident?.location?.coordinates?.[0] ?? incident?.longitude;
-          return lat != null && lng != null ? (
-            <div style={{
-              fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 9,
-              color: "rgba(0,212,255,0.45)",
-              letterSpacing: "0.5px",
-              marginBottom: time ? 6 : 0,
-            }}>
-              📍 {Number(lat).toFixed(4)}, {Number(lng).toFixed(4)}
-            </div>
-          ) : null;
-        })()}
-
-        {/* Timestamp */}
-        {time && (
-          <div style={{
-            fontFamily: "'Share Tech Mono', monospace",
-            fontSize: 9,
-            color: "rgba(255,255,255,0.20)",
-            letterSpacing: "0.5px",
-          }}>
-            🕐 {time}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LIVEMAP — identical props and all original logic preserved
+   LIVEMAP
 ══════════════════════════════════════════════════════════════════════════ */
-export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }: any) {
+export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident, operatorLoc }: any) {
   const [incidents, setIncidents] = useState<any[]>([]);
-  const [operatorLocation, setOperatorLocation] = useState<[number, number]>([23.1815, 75.7849]);
 
   useEffect(() => {
     // Inject popup styles once
@@ -237,20 +150,7 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
       document.head.appendChild(style);
     }
 
-    // 1. GET OPERATOR LOCATION
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log("📍 Operator Locked:", position.coords.latitude, position.coords.longitude);
-          setOperatorLocation([position.coords.latitude, position.coords.longitude]);
-        },
-        (error) => {
-          console.error("Geolocation failed:", error.message);
-        }
-      );
-    }
-
-    // 2. FETCH THREATS
+    // FETCH THREATS
     const fetchIncidents = async () => {
       try {
         const { data } = await api.get("/incidents");
@@ -261,15 +161,10 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
     };
     fetchIncidents();
 
-    // 3. LISTEN FOR LIVE BROADCASTS
+    // LISTEN FOR LIVE BROADCASTS
     socket.on("new-incident", (newIncident) => {
-      // Update the map's pins
       setIncidents((prev) => [...prev, newIncident]);
-
-      // UPDATE THE SIDEBAR FEED INSTANTLY
-      if (onNewIncident) {
-        onNewIncident(newIncident);
-      }
+      if (onNewIncident) onNewIncident(newIncident);
     });
 
     return () => {
@@ -277,10 +172,16 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
     };
   }, [onNewIncident]);
 
+  // Determine the center of the map. If operator has a GPS lock, center on them. 
+  // Otherwise, default to [23.1815, 75.7849]. (Note: Leaflet uses [lat, lng])
+  const mapCenter: [number, number] = operatorLoc 
+    ? [operatorLoc[1], operatorLoc[0]] 
+    : [23.1815, 75.7849];
+
   return (
     <MapContainer
-      center={operatorLocation}
-      zoom={13}
+      center={mapCenter}
+      zoom={14}
       className="h-full w-full relative z-0"
     >
       <TileLayer
@@ -288,22 +189,27 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
         attribution="&copy; CARTO"
       />
 
-      {/* 🎯 Forces the map to move when operatorLocation updates */}
-      <MapRecenter center={operatorLocation} />
+      <MapRecenter center={mapCenter} />
 
-      {/* Target selection pin */}
       <LocationMarker position={selectedPos} onLocationSelected={onSelectLocation} />
 
-      {/* Render all incidents with safety checks and dynamic colors */}
+      {/* 🔴 NEW: The White Operator Beacon */}
+      {operatorLoc && (
+        <Marker position={[operatorLoc[1], operatorLoc[0]]} icon={operatorIcon}>
+          <Popup className="sentinel-popup">
+            <div style={{ fontFamily: "'Rajdhani', sans-serif", padding: "10px", color: "#00d4ff", fontSize: "14px", fontWeight: "bold", textAlign: "center", letterSpacing: "1px" }}>
+              📍 FIELD AGENT (YOU)
+            </div>
+          </Popup>
+        </Marker>
+      )}
+
+      {/* Render all incidents */}
       {incidents.map((incident: any) => {
-        // Safely extract coordinates using optional chaining
         const lat = incident?.location?.coordinates?.[1] || incident?.latitude;
         const lng = incident?.location?.coordinates?.[0] || incident?.longitude;
 
-        // Strict check to skip broken database entries
-        if (lat === undefined || lng === undefined || lat === null || lng === null) {
-          return null;
-        }
+        if (lat === undefined || lng === undefined || lat === null || lng === null) return null;
 
         return (
           <Marker
