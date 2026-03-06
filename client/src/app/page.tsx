@@ -1,7 +1,44 @@
 import Link from "next/link";
 
+// ── Types ──────────────────────────────────────────────────────────────
+interface Feature {
+  icon: string;
+  tag: string;
+  title: string;
+  body: string;
+  accent: string;
+}
+
+interface StackItem {
+  name: string;
+  color: string;
+}
+
+interface Stat {
+  value: string;
+  label: string;
+}
+
+interface Orb {
+  w: number;
+  top?: string;
+  left?: string;
+  bottom?: string;
+  right?: string;
+  c: string;
+  d: string;
+}
+
+interface Bracket {
+  top?: number;
+  left?: number;
+  right?: number;
+  bottom?: number;
+  br: string;
+}
+
 // ── Static data arrays (fill from API/CMS later) ─────────────────────────
-const FEATURES = [
+const FEATURES: Feature[] = [
   {
     icon: "⚡",
     tag: "PROTOCOL-01",
@@ -25,7 +62,7 @@ const FEATURES = [
   },
 ];
 
-const STACK = [
+const STACK: StackItem[] = [
   { name: "Next.js 14",     color: "#fff"    },
   { name: "Node + Fastify", color: "#00e676" },
   { name: "MongoDB Atlas",  color: "#00d4ff" },
@@ -34,7 +71,7 @@ const STACK = [
   { name: "JWT Auth",       color: "#ff3b3b" },
 ];
 
-const STATS = [
+const STATS: Stat[] = [
   { value: "< 200ms", label: "Broadcast latency" },
   { value: "99.9%",   label: "Uptime SLA"         },
   { value: "∞",       label: "Concurrent ops"     },
@@ -42,6 +79,19 @@ const STATS = [
 ];
 
 export default function Home() {
+  const orbs: Orb[] = [
+    { w:700, top:"-15%", left:"-15%", c:"rgba(255,59,59,0.07)",   d:"0s"  },
+    { w:600, top:"30%",  right:"-14%",c:"rgba(0,212,255,0.06)",   d:"5s"  },
+    { w:500, bottom:"-8%",left:"25%", c:"rgba(255,140,66,0.05)",  d:"9s"  },
+  ];
+
+  const brackets: Bracket[] = [
+    { top:8, left:8,  br:"border-t border-l" },
+    { top:8, right:8, br:"border-t border-r" },
+    { bottom:8, left:8,  br:"border-b border-l" },
+    { bottom:8, right:8, br:"border-b border-r" },
+  ];
+
   return (
     <>
       <style>{`
@@ -191,16 +241,12 @@ export default function Home() {
         {/* ══ AMBIENT LAYER ══════════════════════════════════════════ */}
 
         {/* Deep orbs */}
-        {[
-          { w:700, top:"-15%", left:"-15%", c:"rgba(255,59,59,0.07)",   d:"0s"  },
-          { w:600, top:"30%",  right:"-14%",c:"rgba(0,212,255,0.06)",   d:"5s"  },
-          { w:500, bottom:"-8%",left:"25%", c:"rgba(255,140,66,0.05)",  d:"9s"  },
-        ].map((o,i) => (
+        {orbs.map((o,i) => (
           <div key={i} className="pointer-events-none fixed rounded-full"
             style={{
               width:o.w, height:o.w,
-              top:(o as any).top, left:(o as any).left,
-              right:(o as any).right, bottom:(o as any).bottom,
+              top:o.top, left:o.left,
+              right:o.right, bottom:o.bottom,
               background:`radial-gradient(circle,${o.c},transparent 68%)`,
               filter:"blur(80px)",
               animation:`orb-drift 18s ease-in-out ${o.d} infinite`,
@@ -437,16 +483,11 @@ export default function Home() {
                 </div>
 
                 {/* Corner brackets */}
-                {[
-                  { top:8, left:8,  br:"border-t border-l" },
-                  { top:8, right:8, br:"border-t border-r" },
-                  { bottom:8, left:8,  br:"border-b border-l" },
-                  { bottom:8, right:8, br:"border-b border-r" },
-                ].map((c,i) => (
+                {brackets.map((c,i) => (
                   <div key={i} className={`absolute h-6 w-6 ${c.br}`}
                     style={{
-                      top:(c as any).top, left:(c as any).left,
-                      right:(c as any).right, bottom:(c as any).bottom,
+                      top:c.top, left:c.left,
+                      right:c.right, bottom:c.bottom,
                       borderColor:"rgba(0,212,255,0.4)",
                     }}
                   />

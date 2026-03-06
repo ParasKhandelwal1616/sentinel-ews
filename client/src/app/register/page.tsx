@@ -2,6 +2,17 @@
 import { useState } from "react";
 import { useAuth } from "@/src/context/Auth";
 import Link from "next/link";
+import axios from "axios";
+
+interface Orb {
+  w: number;
+  top?: string;
+  left?: string;
+  bottom?: string;
+  right?: string;
+  c: string;
+  d: string;
+}
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
@@ -11,7 +22,6 @@ export default function RegisterPage() {
 
   const { register } = useAuth();
 
-  // ── identical logic ──────────────────────────────────────────────────
   const handleGoogleLogin = () => {
     // Logic: Redirect to your backend Google Auth route
     window.location.href = "http://localhost:5000/api/auth/google";
@@ -21,18 +31,24 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    console.log("Register function from hook:", register); // Should NOT be undefined
     try {
-      console.log("Sending data to backend...");
       await register(formData);
-      console.log("Success!");
-    } catch (err: any) {
-      console.log("Catch block triggered:", err);
-      setError(err.response?.data?.message || "Registration failed. Try again.");
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.message || "Registration failed. Try again.");
+      } else {
+        setError("An unexpected error occurred.");
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const orbs: Orb[] = [
+    { w:560, top:"-14%",   left:"-11%",  c:"rgba(0,230,118,.07)",  d:"0s"  },
+    { w:440, bottom:"-12%",right:"-9%",   c:"rgba(0,212,255,.07)",  d:"5s"  },
+    { w:300, top:"32%",    left:"52%",    c:"rgba(180,79,255,.055)",d:"11s" },
+  ];
 
   return (
     <>
@@ -148,16 +164,12 @@ export default function RegisterPage() {
         style={{ background:"radial-gradient(ellipse at 75% 45%, #020e20 0%, #00060d 55%, #010407 100%)" }}
       >
         {/* ── ambient orbs ───────────────────────────────────────── */}
-        {[
-          { w:560, top:"-14%",   left:"-11%",  c:"rgba(0,230,118,.07)",  d:"0s"  },
-          { w:440, bottom:"-12%",right:"-9%",   c:"rgba(0,212,255,.07)",  d:"5s"  },
-          { w:300, top:"32%",    left:"52%",    c:"rgba(180,79,255,.055)",d:"11s" },
-        ].map((o,i) => (
+        {orbs.map((o,i) => (
           <div key={i} className="pointer-events-none absolute rounded-full"
             style={{
               width:o.w, height:o.w,
-              top:(o as any).top, left:(o as any).left,
-              right:(o as any).right, bottom:(o as any).bottom,
+              top:o.top, left:o.left,
+              right:o.right, bottom:o.bottom,
               background:`radial-gradient(circle,${o.c},transparent 68%)`,
               filter:"blur(72px)",
               animation:`orb 17s ease-in-out ${o.d} infinite`,
