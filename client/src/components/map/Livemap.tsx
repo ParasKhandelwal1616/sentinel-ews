@@ -24,12 +24,6 @@ interface Incident {
   longitude?: number;
 }
 
-interface LiveMapProps {
-  selectedPos: { lat: number; lng: number } | null;
-  onSelectLocation: (pos: { lat: number; lng: number }) => void;
-  onNewIncident?: (incident: Incident) => void;
-}
-
 /* ─── inject dark popup styles once ────────────────────────────────────── */
 const POPUP_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@600;700&family=Sora:wght@400;500;600&display=swap');
@@ -175,9 +169,8 @@ function IncidentPopup({ incident }: { incident: Incident }) {
 /* ══════════════════════════════════════════════════════════════════════════
    LIVEMAP
 ══════════════════════════════════════════════════════════════════════════ */
-export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }: LiveMapProps) {
+export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident, operatorLoc }: any)  {
   const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [operatorLocation, setOperatorLocation] = useState<[number, number]>([23.1815, 75.7849]);
 
   useEffect(() => {
     // Inject popup styles once
@@ -199,7 +192,7 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
     };
     fetchIncidents();
 
-    // 3. LISTEN FOR LIVE BROADCASTS
+    // LISTEN FOR LIVE BROADCASTS
     socket.on("new-incident", (newIncident: Incident) => {
       // Update the map's pins
       setIncidents((prev) => [...prev, newIncident]);
@@ -212,15 +205,15 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
   }, [onNewIncident]);
 
   // Determine the center of the map. If operator has a GPS lock, center on them. 
-  // Otherwise, default to [23.1815, 75.7849]. (Note: Leaflet uses [lat, lng])
+  // Otherwise, default to Gwalior [26.2183, 78.1828]. (Note: Leaflet uses [lat, lng])
   const mapCenter: [number, number] = operatorLoc 
     ? [operatorLoc[1], operatorLoc[0]] 
-    : [23.1815, 75.7849];
+    : [26.2183, 78.1828];
 
   return (
     <MapContainer
-      center={operatorLocation}
-      zoom={13}
+      center={mapCenter}
+      zoom={14}
       zoomControl={false}
       className="h-full w-full relative z-0"
     >
@@ -232,10 +225,21 @@ export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident }
       {/* Manual Zoom Control in the bottom-right corner */}
       <ZoomControl position="bottomright" />
 
-      {/* 🎯 Forces the map to move when operatorLocation updates */}
-      <MapRecenter center={operatorLocation} />
+      {/* 🎯 Forces the map to move when operatorLoc updates */}
+      <MapRecenter center={mapCenter} />
 
       <LocationMarker position={selectedPos} onLocationSelected={onSelectLocation} />
+
+      {/* 🔴 RESTORED: The White Operator Beacon */}
+      {operatorLoc && (
+        <Marker position={[operatorLoc[1], operatorLoc[0]]} icon={operatorIcon}>
+          <Popup className="sentinel-popup">
+            <div style={{ fontFamily: "'Rajdhani', sans-serif", padding: "10px", color: "#00d4ff", fontSize: "14px", fontWeight: "bold", textAlign: "center", letterSpacing: "1px" }}>
+              📍 FIELD AGENT (YOU)
+            </div>
+          </Popup>
+        </Marker>
+      )}
 
       {/* Render all incidents with safety checks and dynamic colors */}
       {incidents.map((incident: Incident) => {

@@ -135,7 +135,9 @@ function DashboardContent() {
   
   // Radar Toggle State
   const [isNearbyMode, setIsNearbyMode] = useState(false);
-  const [operatorLoc] = useState<[number, number]>([75.7849, 23.1815]);
+  
+  // 🔴 RESTORED: Real Hardware GPS State (No hardcoded test values)
+  const [operatorLoc, setOperatorLoc] = useState<[number, number] | null>(null);
 
   // Handle auto-collapse and mobile detection based on screen size
   useEffect(() => {
@@ -152,6 +154,30 @@ function DashboardContent() {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 🔴 RESTORED: 🛰️ LIVE GPS TELEMETRY WITH FALLBACK
+  useEffect(() => {
+    if (!("geolocation" in navigator)) {
+      console.warn("Hardware Error: Geolocation not supported by this device.");
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { longitude, latitude } = position.coords;
+        setOperatorLoc([longitude, latitude]);
+      },
+      (error) => {
+        console.error("GPS Lock Failed:", error.message);
+        console.log("⚙️ Injecting fallback coordinates (Gwalior)...");
+        setOperatorLoc([78.1828, 26.2183]); 
+        navigator.geolocation.clearWatch(watchId); // Stop the infinite loop
+      },
+      { enableHighAccuracy: false, maximumAge: 10000, timeout: 10000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   // 🔴 UPGRADED: Smart Fetching with Loading State preserved
@@ -327,7 +353,7 @@ function DashboardContent() {
             </button>
           )}
 
-          {/* SIDEBAR - Entirely hidden off-screen on mobile when collapsed */}
+          {/* SIDEBAR */}
          <aside className={`fixed md:relative inset-y-0 left-0 bg-slate-950/80 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] z-40 transition-all duration-300 
            ${collapsed 
              ? "-translate-x-full md:translate-x-0 md:w-16 md:p-2" 
@@ -452,13 +478,24 @@ function DashboardContent() {
           {/* MAIN MAP AREA */}
           <main className="relative flex-1 bg-black overflow-hidden h-full w-full">
             
-            {/* HUD Bar - Adjusted for mobile responsiveness */}
+            {/* 🔴 RESTORED: Dynamic Hardware HUD Bar */}
             <div className={`glass absolute left-3 right-3 top-3 z-20 flex items-center justify-between rounded-2xl px-3 py-2 md:px-4 md:py-2.5 transition-all duration-300`}>
               <div className="flex items-center gap-1.5 md:gap-2 overflow-hidden mr-2">
-                <Activity size={12} className="text-[#00d4ff] flex-shrink-0" />
-                <span className="font-orbitron text-[8px] md:text-[10px] font-bold tracking-[1px] md:tracking-[2px] text-white truncate uppercase">
-                  <span className="hidden xs:inline">GEO-TRACKING</span> ACTIVE
+                <Activity size={12} className={operatorLoc ? "text-[#00d4ff] flex-shrink-0" : "text-[#ff8c42] flex-shrink-0 animate-pulse"} />
+                
+                <span className="font-orbitron text-[8px] md:text-[10px] font-bold tracking-[1px] md:tracking-[2px] text-white truncate uppercase hidden sm:inline">
+                  {operatorLoc ? "GEO-TRACKING ACTIVE" : "SEARCHING SATELLITES"}
                 </span>
+
+                {operatorLoc ? (
+                  <span className="font-mono text-[8px] md:text-[9px] text-[#00ff88]/70 sm:ml-2 sm:border-l sm:border-white/10 sm:pl-2">
+                    [{operatorLoc[0].toFixed(4)}, {operatorLoc[1].toFixed(4)}]
+                  </span>
+                ) : (
+                  <span className="font-mono text-[8px] md:text-[9px] text-[#ff8c42]/70 sm:ml-2 sm:border-l sm:border-white/10 sm:pl-2 animate-pulse">
+                    ACQUIRING SIGNAL...
+                  </span>
+                )}
               </div>
               <div className="flex gap-1.5 md:gap-2 flex-shrink-0">
                 <div className="flex items-center gap-1 md:gap-1.5 rounded-full px-2 md:px-3 py-1 text-[8px] md:text-[10px] font-bold text-[#ff4444] bg-[#ff4444]/10 border border-[#ff4444]/30">
@@ -487,7 +524,6 @@ function DashboardContent() {
             {/* 📍 THE MAP CONTAINER */}
             <div className="absolute inset-0 z-0 h-full w-full cursor-crosshair">
               
-              {/* 🔴 FIXED: Passing the live GPS data down to the map */}
               <LiveMap 
                  selectedPos={selectedPos} 
                  onSelectLocation={setSelectedPos} 
