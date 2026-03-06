@@ -384,7 +384,7 @@ export default function Home() {
                 ))}
 
                 {/* Sweep line */}
-                <div className="absolute left-1/2 top-1/2 h-[190px] w-[1px] origin-bottom -translate-x-1/2"
+                <div className="absolute left-1/2 top-1/20 h-[190px] w-[1px] origin-bottom -translate-x-1/2"
                   style={{
                     background:"linear-gradient(to top,rgba(255,59,59,0.6),transparent)",
                     animation:"radar-cw 4s linear infinite",
@@ -393,7 +393,7 @@ export default function Home() {
                 />
 
                 {/* Sweep glow */}
-                <div className="absolute left-1/2 top-1/2 h-[190px] w-[30px] origin-bottom -translate-x-1/2 rounded-full opacity-20"
+                <div className="absolute left-1/2 top-1/20 h-[190px] w-[30px] origin-bottom -translate-x-1/2 rounded-full opacity-20"
                   style={{
                     background:"linear-gradient(to top,rgba(255,59,59,0.8),transparent)",
                     animation:"radar-cw 4s linear infinite",
