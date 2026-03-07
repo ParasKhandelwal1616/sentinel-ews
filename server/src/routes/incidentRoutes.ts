@@ -7,11 +7,12 @@ import {
 } from "../controllers/incidentController.js";
 import { validate } from "../middleware/validateMiddleware.js";
 import { incidentSchema } from "../validations/incidentValidation.js";
+import { upload } from "../middleware/uplode.js";
 
 const router = express.Router();
 
 // 1. CREATE INCIDENT: Validates the data, saves to DB, and triggers Email/Socket broadcasts
-router.post("/", createIncident);
+router.post('/', upload.single('image'), createIncident);
 // 2. GET ALL INCIDENTS: Fetches the historical feed
 router.get("/", getIncidents);
 

@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import api from "@/src/lib/api";
 import {
   LogOut, MapPin, AlertTriangle, Radio,
-  Send, Wifi, User, ChevronRight,
+  Send, Wifi, User, ChevronRight,Camera,
   Activity, CheckCircle
 } from "lucide-react";
 
@@ -23,6 +23,7 @@ interface Incident {
     coordinates: [number, number];
   };
   createdAt: string;
+  imageUrl?: string;
 }
 
 interface Orb {
@@ -93,6 +94,13 @@ function ThreatCard({ threat, delay = 0, onResolve }: { threat: Incident; delay?
         <p className="line-clamp-2 text-[10px] leading-relaxed text-white/38 mb-2">
           {threat.description || "No description provided."}
         </p>
+
+        {/* 🔴 NEW: Mini indicator if the threat has a photo attached */}
+        {threat.imageUrl && (
+          <div className="flex items-center gap-1 text-[#00d4ff] text-[8px] font-orbitron mb-2 opacity-80">
+            <Camera size={9} /> VISUAL EVIDENCE ATTACHED
+          </div>
+        )}
         
         <div className="flex items-center justify-between mt-1.5">
           <span
@@ -124,6 +132,7 @@ function DashboardContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeThreats, setActiveThreats] = useState<Incident[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   // show radar animation once on mount
   const [showRadar, setShowRadar] = useState(true);
@@ -236,25 +245,41 @@ function DashboardContent() {
     }
   };
 
-  const handleReportSubmit = async (e: React.FormEvent) => {
+const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPos) return alert("COMMAND ERROR: Click map to target.");
     if (!formData.topic) return alert("COMMAND ERROR: Topic required.");
 
     setIsSubmitting(true);
     try {
-      await api.post("/incidents", {
-        topic: formData.topic,
-        description: formData.description,
-        severity: formData.severity,
-        location: {
-          type: "Point",
-          coordinates: [selectedPos.lng, selectedPos.lat] 
-        }
+      // 1. Initialize the FormData engine OUTSIDE the api call
+      const uploadData = new FormData();
+      
+      // 2. Append all the text fields
+      uploadData.append("topic", formData.topic);
+      uploadData.append("description", formData.description);
+      uploadData.append("severity", formData.severity.toString());
+      
+      // 3. Append the location (Must be stringified so Multer can process it)
+      uploadData.append("location", JSON.stringify({
+        type: "Point",
+        coordinates: [selectedPos.lng, selectedPos.lat] 
+      }));
+      
+      // 4. Append the image file IF the operator attached one
+      if (imageFile) {
+        uploadData.append("image", imageFile);
+      }
+
+      // 5. Blast it to the backend with the multipart header
+      await api.post("/incidents", uploadData, {
+        headers: { "Content-Type": "multipart/form-data" } // 🔴 CRITICAL FOR MULTER
       });
       
+      // 6. Reset the form UI
       setFormData({ topic: "", description: "", severity: 3 });
       setSelectedPos(null);
+      setImageFile(null); // Clear the photo from the queue
     } catch (err) {
       console.error("Report failed:", err);
     } finally {
@@ -451,10 +476,28 @@ function DashboardContent() {
                         <MapPin size={11} className={selectedPos ? "text-[#00d4ff]" : "text-white/20"} />
                         <span className={`font-mono text-[10px] ${selectedPos ? "text-[#00d4ff]" : "text-white/20"}`}>
                           {selectedPos ? `${selectedPos.lat.toFixed(5)}, ${selectedPos.lng.toFixed(5)}` : "Click map to pin"}
+
                         </span>
                       </div>
                       <input type="text" placeholder="Topic (e.g. Flood)" value={formData.topic} onChange={(e) => setFormData({...formData, topic: e.target.value})} className="s-input" />
                       <textarea placeholder="Situation description..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="s-input h-[72px]" />
+                        {/* 🔴 NEW: The Upload Evidence Box */}
+                      <label className="flex flex-col items-center justify-center w-full py-4 border border-white/10 border-dashed rounded-xl cursor-pointer bg-white/5 hover:bg-white/10 transition-all text-center">
+                        <Camera size={16} className={imageFile ? "text-[#00ff88] mb-1.5" : "text-white/30 mb-1.5"} />
+                        <span className="text-[9px] font-orbitron tracking-widest text-white/50 px-2 line-clamp-1">
+                          {imageFile ? imageFile.name.toUpperCase() : "ATTACH VISUAL EVIDENCE (OPTIONAL)"}
+                        </span>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setImageFile(e.target.files[0]);
+                            }
+                          }} 
+                        />
+                      </label>
                       <div>
                         <div className="mb-1.5 flex justify-between text-[9px] uppercase text-white/30"><label>Severity</label><span>{formData.severity}/5</span></div>
                         <input type="range" min={1} max={5} value={formData.severity} onChange={(e) => setFormData({...formData, severity: Number(e.target.value)})} className="w-full" style={{ accentColor: sev.color }} />

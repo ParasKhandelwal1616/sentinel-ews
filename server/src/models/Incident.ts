@@ -29,6 +29,7 @@ const IncidentSchema = new mongoose.Schema({
     type: String,
     default: "Pending",
   },
+  imageUrl: { type: String, default: null }
 });
 
 IncidentSchema.index({ location: "2dsphere" });
