@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from "rea
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import api from "@/src/lib/api";
 import { LocationMarker } from "./LocationMarker";
 import { io } from "socket.io-client";
@@ -22,6 +23,7 @@ interface Incident {
   createdAt?: string;
   latitude?: number;
   longitude?: number;
+  imageUrl?: string;
 }
 
 /* ─── inject dark popup styles once ────────────────────────────────────── */
@@ -145,6 +147,17 @@ function IncidentPopup({ incident }: { incident: Incident }) {
         </span>
       </div>
       <div style={{ padding: "10px 14px 12px" }}>
+        {/* 🔴 RESTORED: Standard img tag works best inside Leaflet DOM */}
+        {incident.imageUrl && (
+          <div style={{ marginBottom: 10, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <img 
+              src={incident.imageUrl} 
+              alt="Threat Evidence" 
+              style={{ width: '100%', maxHeight: '130px', objectFit: 'cover', display: 'block' }} 
+            />
+          </div>
+        )}
+        
         {incident.description && (
           <p style={{ fontFamily: "'Sora', sans-serif", fontSize: 11, color: "rgba(200,225,255,0.60)", lineHeight: 1.55, marginBottom: 10 }}>
             {incident.description}
