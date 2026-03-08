@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Incident from "../models/Incident.js";
 import User from "../models/User.js"; 
 import { sendEmergencyBlast, IncidentEmailData } from "../utils/mailer.js";
+import { evaluateThreatLevel } from "../utils/ai.js";
 
 // 1. CREATE INCIDENT & TRIGGER BROADCASTS (Upgraded for Cloudinary)
 export const createIncident = async (
@@ -10,35 +11,60 @@ export const createIncident = async (
   next: NextFunction
 ): Promise<Response | void> => {
   try {
-    // 1. Extract data from the multipart form
     const { topic, description, severity } = req.body;
     let locationData = req.body.location;
 
-    // 2. Parse the location back into JSON (FormData sends it as a string)
     if (typeof locationData === 'string') {
       locationData = JSON.parse(locationData);
     }
 
-    // 3. 🔴 NEW: Intercept the secure Cloudinary URL from Multer
-    // (We cast req to any here to bypass strict TS complaining about Multer's .file object)
     const imageUrl = (req as any).file ? (req as any).file.path : null;
 
-    // 4. Save the threat to MongoDB, including the visual evidence
+    let finalSeverity = Number(severity);
+    let finalDescription = description;
+
+    console.log(`🧠 Sending threat "${topic}" to AI for evaluation...`);
+    
+    const aiAssessment = await evaluateThreatLevel(topic, description, imageUrl);
+
+    if (aiAssessment && aiAssessment.severity) {
+      console.log(`🤖 AI Override! Assigned Severity: ${aiAssessment.severity} / 5`);
+      finalSeverity = aiAssessment.severity;
+      
+      let aiNote = `\n\n🤖 AI Assessment: Overrode severity to Level ${aiAssessment.severity}. ${aiAssessment.reasoning}`;
+      
+      // 🔴 FIXED: STRICT BOUNCER LOGIC
+      if (aiAssessment.isVerified === false) {
+        console.log(`🚨 AI DETECTED FALSE EVIDENCE! Blocking report from database.`);
+        // KILL THE REQUEST RIGHT HERE. DO NOT SAVE. DO NOT BROADCAST.
+        return res.status(400).json({ 
+          success: false, 
+          message: "VISUAL VERIFICATION FAILED: The attached image heavily contradicts the reported disaster. Report rejected." 
+        });
+      } else if (imageUrl && aiAssessment.isVerified === true) {
+        console.log(`✅ Visual evidence verified by AI.`);
+        aiNote += `\n\n✅ VISUAL VERIFICATION PASSED: The AI confirms the image matches the report.`;
+      }
+
+      finalDescription = `${description}${aiNote}`;
+    } else {
+      console.log(`⚠️ AI timeout or failure. Falling back to operator's manual severity.`);
+    }
+
+    // This will only run if the AI verified the image (or if no image was uploaded)
     const incident = await Incident.create({
       topic,
-      description,
-      severity: Number(severity), // Ensure severity stays a number
+      description: finalDescription,
+      severity: finalSeverity, 
       location: locationData,
-      imageUrl: imageUrl // 🔴 NEW: The secure cloud link
+      imageUrl: imageUrl 
     });
 
-    // 5. 🔥 REAL-TIME BROADCAST (Socket.io)
     const io = req.app.get("io");
     if (io) {
       io.emit("new-incident", incident);
     }
 
-    // 6. 🚨 GEO-FENCED ALERT ENGINE
     if (incident.severity >= 3) {
       console.log(`⚠️ High-Severity Threat Detected (Level ${incident.severity})! Calculating 5km blast radius...`);
       
@@ -47,7 +73,7 @@ export const createIncident = async (
           $near: {
             $geometry: {
               type: "Point",
-              coordinates: incident.location.coordinates, // [lng, lat]
+              coordinates: incident.location.coordinates, 
             },
             $maxDistance: 5000, 
           },
@@ -65,7 +91,6 @@ export const createIncident = async (
           severity: incident.severity,
           location: incident.location,
         };
-
         sendEmergencyBlast(targetEmails, emailData).catch(console.error);
       } else {
         console.log(`Radar clear. No users found within 5km radius.`);
@@ -77,7 +102,6 @@ export const createIncident = async (
     next(error);
   }
 };
-
 // 2. GET ALL INCIDENTS (For the Feed)
 export const getIncidents = async (
   req: Request,

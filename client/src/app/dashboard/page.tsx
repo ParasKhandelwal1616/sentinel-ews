@@ -280,8 +280,14 @@ const handleReportSubmit = async (e: React.FormEvent) => {
       setFormData({ topic: "", description: "", severity: 3 });
       setSelectedPos(null);
       setImageFile(null); // Clear the photo from the queue
-    } catch (err) {
+    }catch (err: any) {
       console.error("Report failed:", err);
+      // 🔴 Catch the backend rejection and alert the operator
+      if (err.response && err.response.data && err.response.data.message) {
+        alert("⚠️ COMMAND REJECTED: " + err.response.data.message);
+      } else {
+        alert("⚠️ Upload failed. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
