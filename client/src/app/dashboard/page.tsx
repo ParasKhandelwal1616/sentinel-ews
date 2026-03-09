@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import api from "@/src/lib/api";
 import {
   LogOut, MapPin, AlertTriangle, Radio,
-  Send, Wifi, User, ChevronRight,Camera,
+  Send, Wifi, User, ChevronRight, Camera,
   Activity, CheckCircle
 } from "lucide-react";
 
@@ -95,7 +95,7 @@ function ThreatCard({ threat, delay = 0, onResolve }: { threat: Incident; delay?
           {threat.description || "No description provided."}
         </p>
 
-        {/* 🔴 NEW: Mini indicator if the threat has a photo attached */}
+        {/* Mini indicator if the threat has a photo attached */}
         {threat.imageUrl && (
           <div className="flex items-center gap-1 text-[#00d4ff] text-[8px] font-orbitron mb-2 opacity-80">
             <Camera size={9} /> VISUAL EVIDENCE ATTACHED
@@ -133,39 +133,32 @@ function DashboardContent() {
   const [activeThreats, setActiveThreats] = useState<Incident[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  
+  // 🎙️ Voice State
+  const [isListening, setIsListening] = useState(false);
 
-  // show radar animation once on mount
   const [showRadar, setShowRadar] = useState(true);
-
   const [collapsed, setCollapsed] = useState(true);
   const [activeTab, setActiveTab] = useState<"feed" | "report">("feed");
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   
-  // Radar Toggle State
   const [isNearbyMode, setIsNearbyMode] = useState(false);
-  
-  // 🔴 RESTORED: Real Hardware GPS State (No hardcoded test values)
   const [operatorLoc, setOperatorLoc] = useState<[number, number] | null>(null);
 
-  // Handle auto-collapse and mobile detection based on screen size
   useEffect(() => {
     setMounted(true);
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      if (!mobile) {
-        setCollapsed(false);
-      } else {
-        setCollapsed(true);
-      }
+      if (!mobile) setCollapsed(false);
+      else setCollapsed(true);
     };
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🔴 RESTORED: 🛰️ LIVE GPS TELEMETRY WITH FALLBACK
   useEffect(() => {
     if (!("geolocation" in navigator)) {
       console.warn("Hardware Error: Geolocation not supported by this device.");
@@ -181,7 +174,7 @@ function DashboardContent() {
         console.error("GPS Lock Failed:", error.message);
         console.log("⚙️ Injecting fallback coordinates (Gwalior)...");
         setOperatorLoc([78.1828, 26.2183]); 
-        navigator.geolocation.clearWatch(watchId); // Stop the infinite loop
+        navigator.geolocation.clearWatch(watchId);
       },
       { enableHighAccuracy: false, maximumAge: 10000, timeout: 10000 }
     );
@@ -189,17 +182,15 @@ function DashboardContent() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 🔴 UPGRADED: Smart Fetching with Loading State preserved
   const fetchFeed = useCallback(async () => {
     setIsLoadingFeed(true);
     try {
       let endpoint = "/incidents";
       
       if (isNearbyMode) {
-        // 🔴 STRICT REAL-WORLD CHECK: No GPS lock = No Radar
         if (!operatorLoc) {
-          alert("COMMAND ERROR: Awaiting GPS lock. Cannot calculate 5km proximity.");
-          setIsNearbyMode(false); // Force the toggle back off
+          alert("COMMAND ERROR: Awaiting GPS lock. Cannot calculate proximity.");
+          setIsNearbyMode(false);
           setIsLoadingFeed(false);
           return;
         }
@@ -245,44 +236,74 @@ function DashboardContent() {
     }
   };
 
-const handleReportSubmit = async (e: React.FormEvent) => {
+  // 🎙️ THE VOICE UPLINK ENGINE
+  const startVoiceCommand = (e: React.MouseEvent) => {
+    e.preventDefault(); 
+
+    // @ts-ignore
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      return alert("⚠️ COMMAND ERROR: Your browser does not support Voice Uplink.");
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false; 
+    recognition.interimResults = false;
+    recognition.lang = "en-US"; 
+
+    recognition.onstart = () => setIsListening(true);
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      console.log("🎙️ Voice Captured:", transcript);
+      
+      setFormData((prev: any) => ({
+        ...prev,
+        description: prev.description ? prev.description + " " + transcript : transcript,
+      }));
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Mic error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.start();
+  };
+
+  const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPos) return alert("COMMAND ERROR: Click map to target.");
     if (!formData.topic) return alert("COMMAND ERROR: Topic required.");
 
     setIsSubmitting(true);
     try {
-      // 1. Initialize the FormData engine OUTSIDE the api call
       const uploadData = new FormData();
       
-      // 2. Append all the text fields
       uploadData.append("topic", formData.topic);
       uploadData.append("description", formData.description);
       uploadData.append("severity", formData.severity.toString());
       
-      // 3. Append the location (Must be stringified so Multer can process it)
       uploadData.append("location", JSON.stringify({
         type: "Point",
         coordinates: [selectedPos.lng, selectedPos.lat] 
       }));
       
-      // 4. Append the image file IF the operator attached one
       if (imageFile) {
         uploadData.append("image", imageFile);
       }
 
-      // 5. Blast it to the backend with the multipart header
       await api.post("/incidents", uploadData, {
-        headers: { "Content-Type": "multipart/form-data" } // 🔴 CRITICAL FOR MULTER
+        headers: { "Content-Type": "multipart/form-data" } 
       });
       
-      // 6. Reset the form UI
       setFormData({ topic: "", description: "", severity: 3 });
       setSelectedPos(null);
-      setImageFile(null); // Clear the photo from the queue
-    }catch (err: any) {
+      setImageFile(null); 
+    } catch (err: any) {
       console.error("Report failed:", err);
-      // 🔴 Catch the backend rejection and alert the operator
       if (err.response && err.response.data && err.response.data.message) {
         alert("⚠️ COMMAND REJECTED: " + err.response.data.message);
       } else {
@@ -359,7 +380,6 @@ const handleReportSubmit = async (e: React.FormEvent) => {
 
         <div className="font-sora relative flex h-screen w-full overflow-hidden bg-[#020e20]">
           
-          {/* Background Orbs */}
           {orbs.map((o, i) => (
             <div
               key={i}
@@ -374,7 +394,6 @@ const handleReportSubmit = async (e: React.FormEvent) => {
             />
           ))}
 
-          {/* Mobile Tab Toggle - Only visible on mobile when sidebar is collapsed */}
           {collapsed && (
             <button 
               onClick={() => setCollapsed(false)} 
@@ -384,14 +403,12 @@ const handleReportSubmit = async (e: React.FormEvent) => {
             </button>
           )}
 
-          {/* SIDEBAR */}
          <aside className={`fixed md:relative inset-y-0 left-0 bg-slate-950/80 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] z-40 transition-all duration-300 
            ${collapsed 
              ? "-translate-x-full md:translate-x-0 md:w-16 md:p-2" 
              : "translate-x-0 w-[85vw] md:w-80 p-6"} 
            overflow-y-auto thin-scroll md:flex-shrink-0`}>
             
-            {/* Header */}
             <div className="flex flex-shrink-0 items-center justify-between px-1 py-4 border-b border-white/10">
               {(!collapsed || isMobile) && (
                 <div className="flex items-center gap-2.5">
@@ -409,7 +426,6 @@ const handleReportSubmit = async (e: React.FormEvent) => {
 
             {(!collapsed || isMobile) && (
               <div className="flex flex-1 flex-col overflow-hidden px-1 py-3">
-                {/* Operator Card */}
                 <div className="mb-3 flex items-center gap-2.5 rounded-2xl p-3 bg-white/5 border border-white/10">
                   <div className="flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold text-white bg-gradient-to-br from-[#00d4ff] to-[#b44fff]">
                     {user?.name?.[0]?.toUpperCase() ?? <User size={13} />}
@@ -422,7 +438,6 @@ const handleReportSubmit = async (e: React.FormEvent) => {
                   </div>
                 </div>
 
-                {/* Tabs */}
                 <div className="mb-3 flex border-b border-white/10">
                   <button onClick={() => setActiveTab("feed")} className={`mr-4 pb-2 pt-1.5 text-[10px] font-bold uppercase transition-all ${activeTab === "feed" ? "tab-on" : "tab-off"}`}>
                     <span className="flex items-center gap-1.5"><Radio size={9} /> Live Feed</span>
@@ -432,13 +447,10 @@ const handleReportSubmit = async (e: React.FormEvent) => {
                   </button>
                 </div>
 
-                {/* Tab Content */}
                 <div className="thin-scroll flex-1 overflow-y-auto">
                   {/* LIVE FEED SECTION */}
                   {activeTab === "feed" && (
                     <div className="flex flex-col gap-2">
-                      
-                      {/* Proximity Filter UI */}
                       <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
                         <span className="text-[10px] font-orbitron font-bold tracking-widest text-white/50 uppercase">
                           Proximity
@@ -457,7 +469,6 @@ const handleReportSubmit = async (e: React.FormEvent) => {
                         </button>
                       </div>
 
-                      {/* Feed Loading & Rendering Logic */}
                       {isLoadingFeed ? (
                         <span className="text-xs text-white/30 text-center mt-4 block">Scanning...</span>
                       ) : activeThreats.length === 0 ? (
@@ -482,12 +493,41 @@ const handleReportSubmit = async (e: React.FormEvent) => {
                         <MapPin size={11} className={selectedPos ? "text-[#00d4ff]" : "text-white/20"} />
                         <span className={`font-mono text-[10px] ${selectedPos ? "text-[#00d4ff]" : "text-white/20"}`}>
                           {selectedPos ? `${selectedPos.lat.toFixed(5)}, ${selectedPos.lng.toFixed(5)}` : "Click map to pin"}
-
                         </span>
                       </div>
-                      <input type="text" placeholder="Topic (e.g. Flood)" value={formData.topic} onChange={(e) => setFormData({...formData, topic: e.target.value})} className="s-input" />
-                      <textarea placeholder="Situation description..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="s-input h-[72px]" />
-                        {/* 🔴 NEW: The Upload Evidence Box */}
+                      
+                      <input 
+                        type="text" 
+                        placeholder="Topic (e.g. Flood)" 
+                        value={formData.topic} 
+                        onChange={(e) => setFormData({...formData, topic: e.target.value})} 
+                        className="s-input" 
+                      />
+                      
+                      {/* 🔴 RESTORED & FIXED: Voice Uplink Container */}
+                      <div className="flex gap-2">
+                        <textarea 
+                          placeholder="Situation description..." 
+                          value={formData.description} 
+                          onChange={(e) => setFormData({...formData, description: e.target.value})} 
+                          className="s-input h-[72px] flex-1" 
+                        />
+                        <button
+                          type="button"
+                          onClick={startVoiceCommand}
+                          className={`flex flex-col items-center justify-center gap-1 rounded-xl px-3 transition-all ${
+                            isListening
+                              ? "bg-[#ff4444]/20 border border-[#ff4444] text-[#ff4444] shadow-[0_0_15px_rgba(255,68,68,0.4)]"
+                              : "bg-[#00d4ff]/10 border border-[#00d4ff]/30 text-[#00d4ff] hover:bg-[#00d4ff]/20"
+                          }`}
+                        >
+                          <span className="text-lg">{isListening ? "🔴" : "🎙️"}</span>
+                          <span className="font-orbitron text-[8px] tracking-widest font-bold">
+                            {isListening ? "REC" : "VOICE"}
+                          </span>
+                        </button>
+                      </div>
+
                       <label className="flex flex-col items-center justify-center w-full py-4 border border-white/10 border-dashed rounded-xl cursor-pointer bg-white/5 hover:bg-white/10 transition-all text-center">
                         <Camera size={16} className={imageFile ? "text-[#00ff88] mb-1.5" : "text-white/30 mb-1.5"} />
                         <span className="text-[9px] font-orbitron tracking-widest text-white/50 px-2 line-clamp-1">
@@ -527,7 +567,6 @@ const handleReportSubmit = async (e: React.FormEvent) => {
           {/* MAIN MAP AREA */}
           <main className="relative flex-1 bg-black overflow-hidden h-full w-full">
             
-            {/* 🔴 RESTORED: Dynamic Hardware HUD Bar */}
             <div className={`glass absolute left-3 right-3 top-3 z-20 flex items-center justify-between rounded-2xl px-3 py-2 md:px-4 md:py-2.5 transition-all duration-300`}>
               <div className="flex items-center gap-1.5 md:gap-2 overflow-hidden mr-2">
                 <Activity size={12} className={operatorLoc ? "text-[#00d4ff] flex-shrink-0" : "text-[#ff8c42] flex-shrink-0 animate-pulse"} />
@@ -557,7 +596,6 @@ const handleReportSubmit = async (e: React.FormEvent) => {
               </div>
             </div>
 
-            {/* 🔴 FAST RADAR OVERLAY */}
             {showRadar && (
               <div
                 className="absolute left-0 right-0 z-10 pointer-events-none"
@@ -570,9 +608,7 @@ const handleReportSubmit = async (e: React.FormEvent) => {
               />
             )}
 
-            {/* 📍 THE MAP CONTAINER */}
             <div className="absolute inset-0 z-0 h-full w-full cursor-crosshair">
-              
               <LiveMap 
                  selectedPos={selectedPos} 
                  onSelectLocation={setSelectedPos} 
@@ -580,7 +616,6 @@ const handleReportSubmit = async (e: React.FormEvent) => {
                  onThreatResolved={(resolvedId: string) => { setActiveThreats((prev) => prev.filter((t) => t._id !== resolvedId)); }}
                  operatorLoc={operatorLoc} 
               />
-              
             </div>
           </main>
         </div>
