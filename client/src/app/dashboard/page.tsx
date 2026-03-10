@@ -5,6 +5,7 @@ import { useAuth } from "@/src/context/Auth";
 import dynamic from "next/dynamic";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, Suspense } from "react";
+import { saveReportOffline, getOfflineReports, deleteOfflineReport } from "@/src/lib/offlineStore";
 import api from "@/src/lib/api";
 import {
   LogOut, MapPin, AlertTriangle, Radio,
@@ -35,6 +36,15 @@ interface Orb {
   c: string;
   d: string;
 }
+// 🛠️ HELPER: Convert File to Base64 for safe offline storage
+const convertToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
 
 // IMPORTANT: Leaflet MUST be dynamic
 const LiveMap = dynamic(() => import("@/src/components/map/Livemap"), {
@@ -226,6 +236,54 @@ function DashboardContent() {
     }
   }, [searchParams, router]);
 
+  // 🔴 NEW: THE AUTO-SYNC ENGINE
+  useEffect(() => {
+    const syncOfflineReports = async () => {
+      const pendingReports = await getOfflineReports();
+      if (pendingReports.length === 0) return;
+
+      console.log(`📡 SIGNAL RESTORED: Syncing ${pendingReports.length} offline reports...`);
+
+      for (const report of pendingReports) {
+        try {
+          const uploadData = new FormData();
+          uploadData.append("topic", report.topic);
+          uploadData.append("description", report.description);
+          uploadData.append("severity", report.severity.toString());
+          uploadData.append("location", JSON.stringify(report.location));
+
+          // If we saved an image as Base64, convert it back to a Blob for Multer
+          if (report.image) {
+            const res = await fetch(report.image);
+            const blob = await res.blob();
+            uploadData.append("image", blob, "offline_evidence.jpg");
+          }
+
+          await api.post("/incidents", uploadData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+
+          // Delete from local vault once successful
+          await deleteOfflineReport(report.id);
+          console.log(`✅ Offline report ${report.id} synced successfully!`);
+        } catch (error) {
+          console.error(`❌ Failed to sync report ${report.id}:`, error);
+        }
+      }
+      
+      // Refresh the feed once everything is synced
+      fetchFeed();
+    };
+
+    // Listen for the browser telling us the internet is back
+    window.addEventListener('online', syncOfflineReports);
+    
+    // Also check on initial boot just in case we came back online while the app was closed
+    if (navigator.onLine) syncOfflineReports();
+
+    return () => window.removeEventListener('online', syncOfflineReports);
+  }, [fetchFeed]);
+
   const handleResolveThreat = async (id: string) => {
     try {
       setActiveThreats((prev) => prev.filter((t) => t._id !== id));
@@ -273,27 +331,56 @@ function DashboardContent() {
     recognition.start();
   };
 
-  const handleReportSubmit = async (e: React.FormEvent) => {
+const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPos) return alert("COMMAND ERROR: Click map to target.");
     if (!formData.topic) return alert("COMMAND ERROR: Topic required.");
 
     setIsSubmitting(true);
+
+    // 🔴 NEW: THE OFFLINE INTERCEPTOR
+    if (!navigator.onLine) {
+      console.warn("⚠️ NO SIGNAL DETECTED. Intercepting payload for local storage...");
+      
+      let base64Image = null;
+      if (imageFile) {
+        base64Image = await convertToBase64(imageFile);
+      }
+
+      const offlinePayload = {
+        topic: formData.topic,
+        description: formData.description,
+        severity: formData.severity,
+        location: {
+          type: "Point",
+          coordinates: [selectedPos.lng, selectedPos.lat] 
+        },
+        image: base64Image // Stored safely as a string
+      };
+
+      await saveReportOffline(offlinePayload);
+      
+      alert("📡 ZERO-SIGNAL MODE: You are offline. Threat report cached securely to device. It will automatically broadcast when your signal is restored.");
+      
+      setFormData({ topic: "", description: "", severity: 3 });
+      setSelectedPos(null);
+      setImageFile(null);
+      setIsSubmitting(false);
+      return; // Stop the function here so it doesn't try to hit the API
+    }
+
+    // 🟢 ONLINE MODE: Proceed with normal upload
     try {
       const uploadData = new FormData();
-      
       uploadData.append("topic", formData.topic);
       uploadData.append("description", formData.description);
       uploadData.append("severity", formData.severity.toString());
-      
       uploadData.append("location", JSON.stringify({
         type: "Point",
         coordinates: [selectedPos.lng, selectedPos.lat] 
       }));
       
-      if (imageFile) {
-        uploadData.append("image", imageFile);
-      }
+      if (imageFile) uploadData.append("image", imageFile);
 
       await api.post("/incidents", uploadData, {
         headers: { "Content-Type": "multipart/form-data" } 
@@ -302,6 +389,7 @@ function DashboardContent() {
       setFormData({ topic: "", description: "", severity: 3 });
       setSelectedPos(null);
       setImageFile(null); 
+      fetchFeed(); // Refresh the map
     } catch (err: any) {
       console.error("Report failed:", err);
       if (err.response && err.response.data && err.response.data.message) {
