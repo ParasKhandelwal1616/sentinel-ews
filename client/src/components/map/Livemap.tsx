@@ -3,7 +3,6 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from "rea
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import api from "@/src/lib/api";
 import { LocationMarker } from "./LocationMarker";
 import { io } from "socket.io-client";
@@ -123,9 +122,6 @@ const getSeverityIcon = (severity: number) => {
 /* ─── Styled popup content ───────────────────────────────────────────────── */
 function IncidentPopup({ incident }: { incident: Incident }) {
   const sev = getSevConfig(incident.severity);
-  const time = incident.createdAt
-    ? new Date(incident.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : null;
 
   return (
     <div
@@ -150,6 +146,7 @@ function IncidentPopup({ incident }: { incident: Incident }) {
         {/* 🔴 RESTORED: Standard img tag works best inside Leaflet DOM */}
         {incident.imageUrl && (
           <div style={{ marginBottom: 10, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={incident.imageUrl} 
               alt="Threat Evidence" 
@@ -182,6 +179,7 @@ function IncidentPopup({ incident }: { incident: Incident }) {
 /* ══════════════════════════════════════════════════════════════════════════
    LIVEMAP
 ══════════════════════════════════════════════════════════════════════════ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function LiveMap({ selectedPos, onSelectLocation, onNewIncident, operatorLoc }: any)  {
   const [incidents, setIncidents] = useState<Incident[]>([]);
 

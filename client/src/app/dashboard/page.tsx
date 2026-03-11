@@ -298,7 +298,7 @@ function DashboardContent() {
   const startVoiceCommand = (e: React.MouseEvent) => {
     e.preventDefault(); 
 
-    // @ts-ignore
+    // @ts-expect-error SpeechRecognition is not standard DOM type yet
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
@@ -312,16 +312,19 @@ function DashboardContent() {
 
     recognition.onstart = () => setIsListening(true);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       console.log("🎙️ Voice Captured:", transcript);
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setFormData((prev: any) => ({
         ...prev,
         description: prev.description ? prev.description + " " + transcript : transcript,
       }));
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onerror = (event: any) => {
       console.error("Mic error:", event.error);
       setIsListening(false);
@@ -391,6 +394,7 @@ const handleReportSubmit = async (e: React.FormEvent) => {
       setImageFile(null); 
       fetchFeed(); // Refresh the map
     } catch (err: any) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       console.error("Report failed:", err);
       if (err.response && err.response.data && err.response.data.message) {
         alert("⚠️ COMMAND REJECTED: " + err.response.data.message);

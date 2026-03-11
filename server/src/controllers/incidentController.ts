@@ -52,7 +52,7 @@ export const createIncident = async (
     }
 
     // This will only run if the AI verified the image (or if no image was uploaded)
-    const incident = await Incident.create({
+    const incident: any = await Incident.create({
       topic,
       description: finalDescription,
       severity: finalSeverity, 
@@ -87,9 +87,12 @@ export const createIncident = async (
       if (targetEmails.length > 0) {
         const emailData: IncidentEmailData = {
           topic: incident.topic,
-          description: incident.description,
+          description: incident.description || "",
           severity: incident.severity,
-          location: incident.location,
+          location: {
+            type: incident.location.type,
+            coordinates: incident.location.coordinates as [number, number],
+          },
         };
         sendEmergencyBlast(targetEmails, emailData).catch(console.error);
       } else {

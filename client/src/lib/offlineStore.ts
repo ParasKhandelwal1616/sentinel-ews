@@ -16,6 +16,7 @@ export const initDB = async () => {
 };
 
 // 2. Save a report locally when there is no internet
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const saveReportOffline = async (reportData: any) => {
   const db = await initDB();
   await db.add(STORE_NAME, { ...reportData, timestamp: Date.now() });
