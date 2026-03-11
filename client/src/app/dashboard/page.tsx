@@ -393,8 +393,8 @@ const handleReportSubmit = async (e: React.FormEvent) => {
       setSelectedPos(null);
       setImageFile(null); 
       fetchFeed(); // Refresh the map
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       console.error("Report failed:", err);
       if (err.response && err.response.data && err.response.data.message) {
         alert("⚠️ COMMAND REJECTED: " + err.response.data.message);

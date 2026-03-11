@@ -8,7 +8,7 @@ import { LocationMarker } from "./LocationMarker";
 import { io } from "socket.io-client";
 
 // Connect to WebSocket server
-const socket = io("http://localhost:5000");
+const socket = io(process.env.NEXT_PUBLIC_API_URL || "https://sentinel-ews.onrender.com");
 
 interface Incident {
   _id: string;
